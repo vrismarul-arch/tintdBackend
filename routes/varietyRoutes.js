@@ -6,7 +6,7 @@ import {
   updateVariety,
   deleteVariety,
 } from "../controllers/varietyController.js";
-
+//
 const upload = multer({ dest: "uploads/" });
 const router = express.Router();
 
