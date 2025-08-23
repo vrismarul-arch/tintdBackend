@@ -1,3 +1,4 @@
+// routes/adminRoutes.js
 import express from "express";
 import {
   createCategory,
@@ -11,6 +12,7 @@ import {
   createService,
   getServices,
   updateService,
+  getServiceById,
   deleteService,
   upload as serviceUpload,
 } from "../controllers/serviceController.js";
@@ -33,7 +35,6 @@ import {
 
 const router = express.Router();
 
-
 // -------- Categories --------
 router.post("/categories", categoryUpload.single("image"), createCategory);
 router.get("/categories", getCategories);
@@ -47,17 +48,16 @@ router.put("/subcategories/:id", subCategoryUpload.single("image"), updateSubCat
 router.delete("/subcategories/:id", deleteSubCategory);
 
 // -------- Varieties --------
-// Varieties
 router.post("/varieties", varietyUpload.single("image"), createVariety);
 router.get("/varieties", getVarieties);
 router.put("/varieties/:id", varietyUpload.single("image"), updateVariety);
 router.delete("/varieties/:id", deleteVariety);
 
-
 // -------- Services --------
-router.post("/services", serviceUpload.single("image"), createService);
+router.post("/services", serviceUpload.any(), createService);
 router.get("/services", getServices);
-router.put("/services/:id", serviceUpload.single("image"), updateService);
+router.get("/services/:id", getServiceById);
+router.put("/services/:id", serviceUpload.any(), updateService);
 router.delete("/services/:id", deleteService);
 
 export default router;

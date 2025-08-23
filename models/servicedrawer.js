@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 
 const serviceDrawerSchema = new mongoose.Schema(
-  {
+{
     // ✅ Step 1: Overview Section
     overview: [
       {

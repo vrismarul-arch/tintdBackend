@@ -13,7 +13,7 @@ const calculateDiscount = (originalPrice, price) => {
   return Math.round(((originalPrice - price) / originalPrice) * 100);
 };
 
-// Upload image to Supabase
+// Upload file to Supabase
 const uploadToSupabase = async (file) => {
   const fileName = `${Date.now()}-${file.originalname}`;
   const { error } = await supabase.storage
@@ -28,44 +28,65 @@ const uploadToSupabase = async (file) => {
   return `${process.env.SUPABASE_URL}/storage/v1/object/public/tintd/${fileName}`;
 };
 
+// 🔄 Helper: map uploaded files into JSON arrays
+const processNestedImages = async (data, files, field, fileFieldName) => {
+  if (!data[field]) return [];
+  let arr;
+  try {
+    arr = JSON.parse(data[field]);
+  } catch {
+    arr = data[field];
+  }
+  if (!Array.isArray(arr)) return [];
+
+  arr = await Promise.all(
+    arr.map(async (item, idx) => {
+      if (item.img && typeof item.img === "string" && item.img.startsWith("http")) {
+        return item; // keep existing URL
+      }
+
+      // check if a file was uploaded for this index
+      const uploaded = files.find((f) => f.fieldname === `${fileFieldName}_${idx}`);
+      if (uploaded) {
+        const url = await uploadToSupabase(uploaded);
+        return { ...item, img: url };
+      }
+
+      return item;
+    })
+  );
+
+  return arr;
+};
+
+
 // ✅ CREATE
 export const createService = async (req, res) => {
   try {
     let data = req.body;
 
-    // Parse nested arrays (they come as JSON string from FormData)
-    ["Overview", "procedureSteps", "thingsToKnow", "precautionsAftercare", "faqs"].forEach(
-      (field) => {
-        if (data[field]) {
-          try {
-            data[field] = JSON.parse(data[field]);
-          } catch {
-            data[field] = [];
-          }
-        }
-      }
-    );
+    data.overview = await processNestedImages(data, req.files, "overview", "overviewImages");
+    data.procedureSteps = await processNestedImages(data, req.files, "procedureSteps", "procedureStepsImages");
+    data.thingsToKnow = JSON.parse(data.thingsToKnow || "[]");
+    data.precautionsAftercare = JSON.parse(data.precautionsAftercare || "[]");
+    data.faqs = JSON.parse(data.faqs || "[]");
 
-    // Upload main image
-    let imageUrl = null;
-    if (req.file) {
-      imageUrl = await uploadToSupabase(req.file);
+    // Upload main image if exists
+    const mainImage = req.files.find((f) => f.fieldname === "image");
+    if (mainImage) {
+      data.imageUrl = await uploadToSupabase(mainImage);
     }
 
-    // Handle discount calculation
     if (data.originalPrice && data.price) {
       data.discount = calculateDiscount(data.originalPrice, data.price);
     }
 
-    const service = new Service({
-      ...data,
-      imageUrl,
-    });
-
+    const service = new Service(data);
     await service.save();
     res.status(201).json(service);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error("Create Service Error:", err);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 };
 
@@ -74,29 +95,20 @@ export const updateService = async (req, res) => {
   try {
     let data = req.body;
 
-    // Parse JSON arrays
-    ["Overview", "procedureSteps", "thingsToKnow", "precautionsAftercare", "faqs"].forEach(
-      (field) => {
-        if (data[field]) {
-          try {
-            data[field] = JSON.parse(data[field]);
-          } catch {
-            // already array or invalid JSON, ignore
-          }
-        }
-      }
-    );
+    data.overview = await processNestedImages(data, req.files, "overview", "overviewImages");
+    data.procedureSteps = await processNestedImages(data, req.files, "procedureSteps", "procedureStepsImages");
+    data.thingsToKnow = JSON.parse(data.thingsToKnow || "[]");
+    data.precautionsAftercare = JSON.parse(data.precautionsAftercare || "[]");
+    data.faqs = JSON.parse(data.faqs || "[]");
 
-    // Upload new image if provided
-    if (req.file) {
-      data.imageUrl = await uploadToSupabase(req.file);
+    // Upload new main image if provided
+    const mainImage = req.files.find((f) => f.fieldname === "image");
+    if (mainImage) {
+      data.imageUrl = await uploadToSupabase(mainImage);
     }
 
-    // Auto-calc discount
-    if (data.originalPrice) {
-      if (data.price) {
-        data.discount = calculateDiscount(data.originalPrice, data.price);
-      }
+    if (data.originalPrice && data.price) {
+      data.discount = calculateDiscount(data.originalPrice, data.price);
     }
 
     const updated = await Service.findByIdAndUpdate(req.params.id, data, {
@@ -106,24 +118,42 @@ export const updateService = async (req, res) => {
 
     res.json(updated);
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    console.error("Update Service Error:", err);
+    res.status(500).json({ error: err.message, stack: err.stack });
   }
 };
 
-// ✅ READ
-// ✅ READ
+// ✅ READ ALL
 export const getServices = async (req, res) => {
   try {
     const { category } = req.query;
     const query = category ? { category } : {};
 
     const services = await Service.find(query)
-      .populate("category", "name description imageUrl")     // Category details
-      .populate("subCategory", "name description imageUrl")  // SubCategory details
-      .populate("variety", "name description imageUrl");     // Variety details
+      .populate("category", "name description imageUrl")
+      .populate("subCategory", "name description imageUrl")
+      .populate("variety", "name description imageUrl");
 
     res.json(services);
   } catch (err) {
+    console.error("Get Services Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// ✅ READ ONE
+export const getServiceById = async (req, res) => {
+  try {
+    const service = await Service.findById(req.params.id)
+      .populate("category", "name description imageUrl")
+      .populate("subCategory", "name description imageUrl")
+      .populate("variety", "name description imageUrl");
+
+    if (!service) return res.status(404).json({ error: "Service not found" });
+
+    res.json(service);
+  } catch (err) {
+    console.error("Get Service By ID Error:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -136,6 +166,7 @@ export const deleteService = async (req, res) => {
 
     res.json({ message: "Service deleted" });
   } catch (err) {
+    console.error("Delete Service Error:", err);
     res.status(500).json({ error: err.message });
   }
 };
