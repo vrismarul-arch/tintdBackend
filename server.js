@@ -14,6 +14,7 @@ import subCategoryRoutes from "./routes/subCategoryRoutes.js";
 import varietyRoutes from "./routes/varietyRoutes.js";
 import bannerRoutes from "./routes/bannerRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
 
 // 👉 If you keep REST cart endpoints, leave the next 2 lines;
 //    if you’re using Socket-only for cart, you can remove them.
@@ -22,6 +23,7 @@ import cartRoutes from "./routes/cartRoutes.js";
 // Models needed by Socket.IO handlers
 import Cart from "./models/Cart.js";
 import Service from "./models/Service.js";
+import profileRoutes from "./routes/profileRoutes.js";
 
 dotenv.config();
 
@@ -63,9 +65,10 @@ app.use(express.urlencoded({ extended: true }));
 // 🚏 HTTP Routes
 // =============================
 app.use("/api", authRoutes);
-
+app.use("/api/profile", profileRoutes);
 // 👉 Keep or remove depending on whether you want REST cart as well.
 app.use("/api", cartRoutes);
+app.use("/api/bookings", bookingRoutes);
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/service-drawers", serviceDrawerRoutes);

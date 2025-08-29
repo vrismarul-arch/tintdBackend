@@ -14,6 +14,7 @@ import {
   updateService,
   getServiceById,
   deleteService,
+  getServicesByIds ,
   upload as serviceUpload,
 } from "../controllers/serviceController.js";
 
@@ -54,6 +55,7 @@ router.put("/varieties/:id", varietyUpload.single("image"), updateVariety);
 router.delete("/varieties/:id", deleteVariety);
 
 // -------- Services --------
+router.post("/services/byIds", getServicesByIds);
 router.post("/services", serviceUpload.any(), createService);
 router.get("/services", getServices);
 router.get("/services/:id", getServiceById);
