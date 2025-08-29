@@ -66,6 +66,7 @@ app.use(express.urlencoded({ extended: true }));
 // =============================
 app.use("/api", authRoutes);
 app.use("/api/profile", profileRoutes);
+
 // 👉 Keep or remove depending on whether you want REST cart as well.
 app.use("/api", cartRoutes);
 app.use("/api/bookings", bookingRoutes);
