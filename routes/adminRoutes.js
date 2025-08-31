@@ -1,5 +1,6 @@
-// routes/adminRoutes.js
 import express from "express";
+
+// Existing controllers
 import {
   createCategory,
   getCategories,
@@ -14,7 +15,7 @@ import {
   updateService,
   getServiceById,
   deleteService,
-  getServicesByIds ,
+  getServicesByIds,
   upload as serviceUpload,
 } from "../controllers/serviceController.js";
 
@@ -34,32 +35,48 @@ import {
   upload as varietyUpload,
 } from "../controllers/varietyController.js";
 
+// New controllers for employees & bookings
+import {
+  getEmployees,
+  createEmployee,
+  getAllBookings,
+  updateBooking,
+} from "../controllers/adminController.js";
+
 const router = express.Router();
 
-// -------- Categories --------
+// ----------------- Categories -----------------
 router.post("/categories", categoryUpload.single("image"), createCategory);
 router.get("/categories", getCategories);
 router.put("/categories/:id", categoryUpload.single("image"), updateCategory);
 router.delete("/categories/:id", deleteCategory);
 
-// -------- SubCategories --------
+// ----------------- SubCategories -----------------
 router.post("/subcategories", subCategoryUpload.single("image"), createSubCategory);
 router.get("/subcategories", getSubCategories);
 router.put("/subcategories/:id", subCategoryUpload.single("image"), updateSubCategory);
 router.delete("/subcategories/:id", deleteSubCategory);
 
-// -------- Varieties --------
+// ----------------- Varieties -----------------
 router.post("/varieties", varietyUpload.single("image"), createVariety);
 router.get("/varieties", getVarieties);
 router.put("/varieties/:id", varietyUpload.single("image"), updateVariety);
 router.delete("/varieties/:id", deleteVariety);
 
-// -------- Services --------
+// ----------------- Services -----------------
 router.post("/services/byIds", getServicesByIds);
 router.post("/services", serviceUpload.any(), createService);
 router.get("/services", getServices);
 router.get("/services/:id", getServiceById);
 router.put("/services/:id", serviceUpload.any(), updateService);
 router.delete("/services/:id", deleteService);
+
+// ----------------- Employees -----------------
+router.get("/employees", getEmployees);
+router.post("/employees", createEmployee);
+
+// ----------------- Bookings -----------------
+router.get("/bookings", getAllBookings);
+router.put("/bookings/:id", updateBooking);
 
 export default router;

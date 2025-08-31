@@ -15,6 +15,7 @@ import varietyRoutes from "./routes/varietyRoutes.js";
 import bannerRoutes from "./routes/bannerRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 // 👉 If you keep REST cart endpoints, leave the next 2 lines;
 //    if you’re using Socket-only for cart, you can remove them.
@@ -66,7 +67,6 @@ app.use(express.urlencoded({ extended: true }));
 // =============================
 app.use("/api", authRoutes);
 app.use("/api/profile", profileRoutes);
-
 // 👉 Keep or remove depending on whether you want REST cart as well.
 app.use("/api", cartRoutes);
 app.use("/api/bookings", bookingRoutes);
@@ -76,6 +76,11 @@ app.use("/api/admin/service-drawers", serviceDrawerRoutes);
 app.use("/api/admin/subcategories", subCategoryRoutes);
 app.use("/api/admin/varieties", varietyRoutes);
 app.use("/api/admin/banners", bannerRoutes);
+
+//payment
+
+
+app.use("/api/payment", paymentRoutes);
 
 // Health check
 app.get("/", (_req, res) => {

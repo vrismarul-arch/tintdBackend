@@ -1,37 +1,96 @@
 import Razorpay from "razorpay";
+import crypto from "crypto";
+import Payment from "../models/Payment.js";
+import Booking from "../models/Booking.js";
 
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY,
-  key_secret: process.env.RAZORPAY_SECRET,
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// 👉 Create order for frontend
+// 🟢 Create Order
 export const createOrder = async (req, res) => {
   try {
-    const { amount, currency = "INR" } = req.body;
+    console.log("👉 Request body:", req.body);
+    const { amount, bookingData, userId } = req.body;
 
-    if (!amount) return res.status(400).json({ error: "Amount required" });
+    if (!amount || isNaN(amount)) {
+      return res.status(400).json({ error: "Amount is required and must be a number" });
+    }
 
     const options = {
-      amount: amount * 100, // in paise
-      currency,
-      receipt: "rcpt_" + Date.now(),
+      amount: Math.round(amount * 100), // in paise
+      currency: "INR",
+      receipt: "receipt_" + Date.now(),
     };
 
     const order = await razorpay.orders.create(options);
-    res.json(order);
+    console.log("✅ Razorpay order:", order);
+
+    await Payment.create({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      bookingData,
+      user: userId || null,
+      status: "created",
+    });
+
+    res.json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+    });
   } catch (err) {
-    console.error("Razorpay order error:", err.message);
-    res.status(500).json({ error: "Failed to create order" });
+    console.error("❌ Create order error:", err);
+    res.status(500).json({ error: err.message });
   }
 };
 
-// 👉 (Optional) verify payment webhook from Razorpay
+// 🟢 Verify Payment
 export const verifyPayment = async (req, res) => {
   try {
-    // todo: verify signature if you enable webhook
-    res.json({ status: "ok" });
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingData } = req.body;
+
+    const sign = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSign = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(sign.toString())
+      .digest("hex");
+
+    if (razorpay_signature === expectedSign) {
+      // Update payment status
+      const payment = await Payment.findOneAndUpdate(
+        { orderId: razorpay_order_id },
+        {
+          paymentId: razorpay_payment_id,
+          signature: razorpay_signature,
+          status: "paid",
+        },
+        { new: true }
+      );
+
+      // Create Booking
+      const booking = new Booking({
+        ...bookingData,
+        paymentMethod: "razorpay",
+        status: "confirmed",
+      });
+      await booking.save();
+
+      payment.booking = booking._id;
+      await payment.save();
+
+      return res.json({ success: true, message: "Payment verified", booking });
+    } else {
+      await Payment.findOneAndUpdate(
+        { orderId: razorpay_order_id },
+        { status: "failed" }
+      );
+      return res.status(400).json({ success: false, message: "Invalid signature" });
+    }
   } catch (err) {
-    res.status(400).json({ error: "Invalid payment verification" });
+    console.error("❌ Verify error:", err);
+    res.status(500).json({ error: err.message });
   }
 };

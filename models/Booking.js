@@ -2,36 +2,35 @@ import mongoose from "mongoose";
 
 const bookingSchema = new mongoose.Schema(
   {
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-
-    // Customer details
-    name: { type: String, required: true },
-    email: { type: String, required: true },
-    phone: { type: String, required: true },
-    address: { type: String, required: true },
-
-    // Location (optional)
-    location: {
-      lat: Number,
-      lng: Number,
-    },
-
-    // Services booked
-    services: [
-      {
-        serviceId: { type: mongoose.Schema.Types.ObjectId, ref: "Service" },
-        quantity: Number,
-      },
-    ],
-
-    // Booking details
-    selectedDate: { type: String, required: true }, // e.g. "2025-09-22"
-    selectedTime: { type: String, required: true }, // e.g. "11:00 AM"
-    totalAmount: { type: Number, required: true },
-    paymentMethod: { type: String, enum: ["cash", "card", "upi"], required: true },
-    status: { type: String, default: "pending" }, // pending / confirmed / cancelled
+    bookingId: { type: String, unique: true, trim: true },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    name: String,
+    email: String,
+    phone: String,
+    address: String,
+    location: { lat: Number, lng: Number },
+    services: [{ serviceId: { type: mongoose.Schema.Types.ObjectId, ref: "Service" }, quantity: Number }],
+    totalAmount: Number,
+    selectedDate: { type: Date, required: true },
+    selectedTime: { type: Date, required: true },
+    paymentMethod: { type: String, required: true },
+    status: { type: String, enum: ["pending", "confirmed", "cancelled"], default: "pending" },
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
   },
   { timestamps: true }
 );
+
+bookingSchema.pre("save", async function (next) {
+  if (this.isNew) {
+    const lastBooking = await this.constructor.findOne({}, {}, { sort: { createdAt: -1 } });
+    let nextId = 1;
+    if (lastBooking && lastBooking.bookingId) {
+      const lastId = parseInt(lastBooking.bookingId.split("-")[1], 10);
+      nextId = lastId + 1;
+    }
+    this.bookingId = `tind-${String(nextId).padStart(3, "0")}`;
+  }
+  next();
+});
 
 export default mongoose.model("Booking", bookingSchema);

@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
+// Protect routes
 export const protect = async (req, res, next) => {
   let token;
 
@@ -10,14 +11,22 @@ export const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       req.user = await User.findById(decoded.id).select("-password");
-      if (!req.user) {
-        return res.status(401).json({ error: "User not found" });
-      }
-      return next();
-    } catch (err) {
-      return res.status(401).json({ error: "Invalid or expired token" });
-    }
-  }
+      if (!req.user) return res.status(401).json({ error: "User not found" });
 
-  return res.status(401).json({ error: "Not authorized, no token" });
+      next();
+    } catch (err) {
+      res.status(401).json({ error: "Invalid or expired token" });
+    }
+  } else {
+    res.status(401).json({ error: "Not authorized, no token" });
+  }
+};
+
+// Admin-only middleware
+export const admin = (req, res, next) => {
+  if (req.user && req.user.role === "admin") {
+    next();
+  } else {
+    res.status(403).json({ error: "Admin access required" });
+  }
 };
