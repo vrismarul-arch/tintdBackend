@@ -35,33 +35,38 @@ import {
   upload as varietyUpload,
 } from "../controllers/varietyController.js";
 
-// Controllers for bookings
+// Controllers for bookings + profile
 import {
   getAllBookings,
-  updateBooking,getBookingById,
+  updateBooking,
+  getBookingById,
+  getAdminProfile,
 } from "../controllers/adminController.js";
+
+// Middleware
+import { protect, admin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// ----------------- Categories -----------------
+/* ----------------- Categories ----------------- */
 router.post("/categories", categoryUpload.single("image"), createCategory);
 router.get("/categories", getCategories);
 router.put("/categories/:id", categoryUpload.single("image"), updateCategory);
 router.delete("/categories/:id", deleteCategory);
 
-// ----------------- SubCategories -----------------
+/* ----------------- SubCategories ----------------- */
 router.post("/subcategories", subCategoryUpload.single("image"), createSubCategory);
 router.get("/subcategories", getSubCategories);
 router.put("/subcategories/:id", subCategoryUpload.single("image"), updateSubCategory);
 router.delete("/subcategories/:id", deleteSubCategory);
 
-// ----------------- Varieties -----------------
+/* ----------------- Varieties ----------------- */
 router.post("/varieties", varietyUpload.single("image"), createVariety);
 router.get("/varieties", getVarieties);
 router.put("/varieties/:id", varietyUpload.single("image"), updateVariety);
 router.delete("/varieties/:id", deleteVariety);
 
-// ----------------- Services -----------------
+/* ----------------- Services ----------------- */
 router.post("/services/byIds", getServicesByIds);
 router.post("/services", serviceUpload.any(), createService);
 router.get("/services", getServices);
@@ -69,8 +74,12 @@ router.get("/services/:id", getServiceById);
 router.put("/services/:id", serviceUpload.any(), updateService);
 router.delete("/services/:id", deleteService);
 
-// ----------------- Bookings -----------------
+/* ----------------- Bookings ----------------- */
 router.get("/bookings", getAllBookings);
 router.put("/bookings/:id", updateBooking);
-router.get("/bookings/:id", getBookingById); 
+router.get("/bookings/:id", getBookingById);
+
+/* ----------------- Admin Profile ----------------- */
+router.get("/profile", protect, admin, getAdminProfile);
+
 export default router;

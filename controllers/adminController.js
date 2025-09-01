@@ -49,3 +49,17 @@ export const updateBooking = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+export const getAdminProfile = async (req, res) => {
+  try {
+    res.json({
+      _id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+      phone: req.user.phone || null,
+      role: req.user.role || "admin",
+    });
+  } catch (error) {
+    console.error("Error fetching admin profile:", error);
+    res.status(500).json({ message: "Failed to fetch profile" });
+  }
+};
