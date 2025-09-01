@@ -1,5 +1,6 @@
 import Booking from "../models/Booking.js";
 import Service from "../models/Service.js";
+import Employee from "../models/Employee.js"; // 🟢 Add this import
 
 // Create a new booking
 export const createBooking = async (req, res) => {
@@ -64,6 +65,52 @@ export const getUserBookings = async (req, res) => {
     res.json(bookings);
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Get all bookings for admin
+export const getAllBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find()
+      .populate("services.serviceId", "name price imageUrl")
+      .populate("user", "name email phone")
+      .populate("assignedTo", "fullName");
+      
+    res.json(bookings);
+  } catch (err) {
+    console.error("Failed to fetch all bookings:", err);
+    res.status(500).json({ error: "Failed to fetch all bookings" });
+  }
+};
+
+// Update a booking's status or assigned employee
+export const updateBooking = async (req, res) => {
+  try {
+    const { status, assignedTo } = req.body;
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    if (status) {
+      booking.status = status;
+    }
+    
+    if (assignedTo) {
+      // Validate employee ID
+      const employee = await Employee.findById(assignedTo);
+      if (!employee) {
+        return res.status(400).json({ error: "Invalid employee ID" });
+      }
+      booking.assignedTo = assignedTo;
+    }
+
+    await booking.save();
+    res.json({ message: "Booking updated successfully", booking });
+  } catch (err) {
+    console.error("Failed to update booking:", err);
     res.status(500).json({ error: err.message });
   }
 };
