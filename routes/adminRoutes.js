@@ -1,6 +1,6 @@
 import express from "express";
 
-// Existing controllers
+// Controllers for categories, subcategories, varieties, services
 import {
   createCategory,
   getCategories,
@@ -35,12 +35,10 @@ import {
   upload as varietyUpload,
 } from "../controllers/varietyController.js";
 
-// New controllers for employees & bookings
+// Controllers for bookings
 import {
-  getEmployees,
-  createEmployee,
   getAllBookings,
-  updateBooking,
+  updateBooking,getBookingById,
 } from "../controllers/adminController.js";
 
 const router = express.Router();
@@ -71,12 +69,8 @@ router.get("/services/:id", getServiceById);
 router.put("/services/:id", serviceUpload.any(), updateService);
 router.delete("/services/:id", deleteService);
 
-// ----------------- Employees -----------------
-router.get("/employees", getEmployees);
-router.post("/employees", createEmployee);
-
 // ----------------- Bookings -----------------
 router.get("/bookings", getAllBookings);
 router.put("/bookings/:id", updateBooking);
-
+router.get("/bookings/:id", getBookingById); 
 export default router;

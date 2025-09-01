@@ -5,28 +5,26 @@ import { OAuth2Client } from "google-auth-library";
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-// ✅ Google OAuth client
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // =============================
-// 📌 Register with email/password
+// Register user
 // =============================
 export const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-
-    // check if user exists
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ error: "User already exists" });
 
-    // create new user
-    const user = new User({ name, email, password });
+    const role = email === process.env.ADMIN_EMAIL ? "admin" : "user";
+    const user = new User({ name, email, password, role });
     await user.save();
 
     res.status(201).json({
       _id: user._id,
       name: user.name,
       email: user.email,
+      role: user.role,
       token: generateToken(user._id),
     });
   } catch (err) {
@@ -36,13 +34,27 @@ export const registerUser = async (req, res) => {
 };
 
 // =============================
-// 📌 Login with email/password
+// Login user
 // =============================
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
+    let user = await User.findOne({ email });
 
-    const user = await User.findOne({ email });
+    // 🔹 Admin login from .env
+    if (!user && email === process.env.ADMIN_EMAIL) {
+      if (password === process.env.ADMIN_PASSWORD) {
+        user = await User.create({
+          name: "Admin",
+          email,
+          password, // hashed automatically
+          role: "admin",
+        });
+      } else {
+        return res.status(401).json({ error: "Invalid email or password" });
+      }
+    }
+
     if (!user) return res.status(401).json({ error: "Invalid email or password" });
 
     const isMatch = await user.matchPassword(password);
@@ -52,6 +64,7 @@ export const loginUser = async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      role: user.role,
       token: generateToken(user._id),
     });
   } catch (err) {
@@ -61,26 +74,11 @@ export const loginUser = async (req, res) => {
 };
 
 // =============================
-// 📌 Get Profile (protected)
-// =============================
-export const getProfile = async (req, res) => {
-  try {
-    const user = await User.findById(req.user._id).select("-password");
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json(user);
-  } catch (err) {
-    console.error("❌ Profile error:", err.message);
-    res.status(500).json({ error: "Profile fetch failed" });
-  }
-};
-
-// =============================
-// 📌 Google Login
+// Google login
 // =============================
 export const googleLogin = async (req, res) => {
   try {
     const { token } = req.body;
-
     const ticket = await client.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -90,11 +88,13 @@ export const googleLogin = async (req, res) => {
 
     let user = await User.findOne({ email });
     if (!user) {
+      const role = email === process.env.ADMIN_EMAIL ? "admin" : "user";
       user = await User.create({
         name,
         email,
         password: Math.random().toString(36).slice(-8),
         avatar: picture,
+        role,
       });
     }
 
@@ -103,6 +103,7 @@ export const googleLogin = async (req, res) => {
       name: user.name,
       email: user.email,
       avatar: user.avatar,
+      role: user.role,
       token: generateToken(user._id),
     });
   } catch (err) {
@@ -111,3 +112,15 @@ export const googleLogin = async (req, res) => {
   }
 };
 
+// =============================
+// Get profile
+// =============================
+export const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select("-password");
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: "Profile fetch failed" });
+  }
+};

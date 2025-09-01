@@ -2,7 +2,7 @@ import express from "express";
 import { 
   createBooking, 
   getUserBookings, 
-  deleteBooking, 
+  deleteBooking,  
   fixOldBookings,
   getAllBookings, // 🟢 Add this import
   updateBooking // 🟢 Add this import

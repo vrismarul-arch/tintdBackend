@@ -1,17 +1,12 @@
 import express from "express";
-import {
-  registerUser,
-  loginUser,
-  getProfile,
-  googleLogin,   // ✅ import this
-} from "../controllers/authController.js";
+import { registerUser, loginUser, googleLogin, getProfile } from "../controllers/authController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/auth/register", registerUser);
-router.post("/auth/login", loginUser);
-router.post("/auth/google", googleLogin);   // ✅ add this line
-router.get("/auth/profile", protect, getProfile);
+router.post("/register", registerUser);
+router.post("/login", loginUser);
+router.post("/google", googleLogin);
+router.get("/profile", protect, getProfile);
 
 export default router;

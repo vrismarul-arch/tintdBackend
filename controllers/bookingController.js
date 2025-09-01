@@ -1,6 +1,6 @@
 import Booking from "../models/Booking.js";
 import Service from "../models/Service.js";
-import Employee from "../models/Employee.js"; // 🟢 Add this import
+// import Employee from "../models/Employee.js"; // 🟢 Add this import
 
 // Create a new booking
 export const createBooking = async (req, res) => {
