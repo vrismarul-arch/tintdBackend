@@ -19,19 +19,17 @@ import varietyRoutes from "./routes/varietyRoutes.js";
 import bannerRoutes from "./routes/bannerRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import adminBookingRoutes from "./routes/admin/adminBookingRoutes.js";
-import partnerRoutes from "./routes/partners/partnerRoutes.js"; // login/profile
-import partnerOnboardingRoutes from "./routes/partners/partnerOnboardingRoutes.js"; // submit/getPartners
+import partnerRoutes from "./routes/partners/partnerRoutes.js"; 
+import partnerOnboardingRoutes from "./routes/partners/partnerOnboardingRoutes.js"; 
 import adminPartnerRoutes from "./routes/partners/adminPartnerRoutes.js";
 
 // Models for Socket.IO
 import Cart from "./models/Cart.js";
 import Service from "./models/Service.js";
+import Booking from "./models/Booking.js";
+import Partner from "./models/partners/Partner.js";
 
 dotenv.config();
-
-// =============================
-// 🔌 Connect MongoDB
-// =============================
 connectDB();
 
 const app = express();
@@ -47,7 +45,7 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // allow Postman/curl
+      if (!origin) return callback(null, true);
       if (!allowedOrigins.includes(origin)) {
         const msg = `🚫 CORS blocked: Origin not allowed -> ${origin}`;
         return callback(new Error(msg), false);
@@ -59,9 +57,6 @@ app.use(
   })
 );
 
-// =============================
-// 📦 Middleware
-// =============================
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -80,20 +75,17 @@ app.use("/api/admin/varieties", varietyRoutes);
 app.use("/api/admin/banners", bannerRoutes);
 app.use("/api/payment", paymentRoutes);
 
-// ✅ Partner
-app.use("/api/partners", partnerRoutes);             // login + profile
-app.use("/api/partners", partnerOnboardingRoutes);   // onboarding submit + list
-app.use("/api/admin/partners", adminPartnerRoutes);  // Admin approving partners
+app.use("/api/partners", partnerRoutes);
+app.use("/api/partners", partnerOnboardingRoutes);
+app.use("/api/admin/partners", adminPartnerRoutes);
 
-// =============================
-// 🩺 Health check route
-// =============================
+// Health check
 app.get("/", (_req, res) => {
   res.send("Salon Booking API is running ✅");
 });
 
 // =============================
-// 🔊 Socket.IO (Cart Updates)
+// 🔊 Socket.IO Setup
 // =============================
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -104,38 +96,41 @@ const io = new Server(httpServer, {
   },
 });
 
-// Emit cart to a user
-const emitCart = async (userId) => {
-  const cart = await Cart.findOne({ user: userId }).populate("items.service");
-  io.to(userId.toString()).emit("cartUpdated", cart || { user: userId, items: [] });
+// Helper to emit updates
+const emitUpdate = (room, event, data) => {
+  io.to(room).emit(event, data);
 };
 
+// =============================
+// 🔄 Socket.IO Connections
+// =============================
 io.on("connection", (socket) => {
   console.log("🟢 Socket connected:", socket.id);
 
-  // Join user cart room
-  socket.on("joinCart", ({ userId }) => {
-    if (!userId) return;
-    socket.join(userId.toString());
-    console.log(`👤 ${socket.id} joined room for user: ${userId}`);
+  // Join room
+  socket.on("joinRoom", ({ room }) => {
+    if (!room) return;
+    socket.join(room);
+    console.log(`👤 ${socket.id} joined room: ${room}`);
   });
 
-  // Get cart
+  // CART EVENTS
+  const emitCart = async (userId) => {
+    const cart = await Cart.findOne({ user: userId }).populate("items.service");
+    emitUpdate(`user:${userId}`, "cartUpdated", cart || { user: userId, items: [] });
+  };
+
   socket.on("getCart", async ({ userId }) => {
     if (!userId) return;
-    try {
-      await emitCart(userId);
-    } catch (err) {
-      io.to(userId.toString()).emit("cartError", "Unable to load cart");
-    }
+    try { await emitCart(userId); } 
+    catch { emitUpdate(`user:${userId}`, "cartError", "Unable to load cart"); }
   });
 
-  // Add item to cart
   socket.on("addToCart", async ({ userId, serviceId, quantity = 1 }) => {
     try {
       if (!userId || !serviceId) return;
       const service = await Service.findById(serviceId);
-      if (!service) return io.to(userId.toString()).emit("cartError", "Service not found");
+      if (!service) return emitUpdate(`user:${userId}`, "cartError", "Service not found");
 
       let cart = await Cart.findOne({ user: userId });
       if (!cart) cart = new Cart({ user: userId, items: [] });
@@ -146,12 +141,9 @@ io.on("connection", (socket) => {
 
       await cart.save();
       await emitCart(userId);
-    } catch (err) {
-      io.to(userId.toString()).emit("cartError", "Unable to add to cart");
-    }
+    } catch { emitUpdate(`user:${userId}`, "cartError", "Unable to add to cart"); }
   });
 
-  // Update item quantity
   socket.on("updateQuantity", async ({ userId, serviceId, quantity }) => {
     try {
       if (!userId || !serviceId) return;
@@ -166,12 +158,9 @@ io.on("connection", (socket) => {
       }
 
       await emitCart(userId);
-    } catch (err) {
-      io.to(userId.toString()).emit("cartError", "Unable to update quantity");
-    }
+    } catch { emitUpdate(`user:${userId}`, "cartError", "Unable to update quantity"); }
   });
 
-  // Remove item from cart
   socket.on("removeFromCart", async ({ userId, serviceId }) => {
     try {
       if (!userId || !serviceId) return;
@@ -181,9 +170,29 @@ io.on("connection", (socket) => {
       cart.items = cart.items.filter((i) => i.service.toString() !== serviceId);
       await cart.save();
       await emitCart(userId);
-    } catch (err) {
-      io.to(userId.toString()).emit("cartError", "Unable to remove item");
-    }
+    } catch { emitUpdate(`user:${userId}`, "cartError", "Unable to remove item"); }
+  });
+
+  // BOOKING EVENTS
+  socket.on("newBooking", async ({ bookingId }) => {
+    const booking = await Booking.findById(bookingId).populate("user");
+    if (!booking) return;
+
+    // Notify user
+    emitUpdate(`user:${booking.user._id}`, "bookingConfirmed", booking);
+    // Notify admin
+    emitUpdate("admin", "newBooking", booking);
+  });
+
+  // PARTNER EVENTS
+  socket.on("partnerApproved", async ({ partnerId }) => {
+    const partner = await Partner.findById(partnerId);
+    if (!partner) return;
+
+    // Notify partner
+    emitUpdate(`partner:${partnerId}`, "partnerApproved", partner);
+    // Notify admin
+    emitUpdate("admin", "partnerApproved", partner);
   });
 
   socket.on("disconnect", () => {

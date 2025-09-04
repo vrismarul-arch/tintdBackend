@@ -17,7 +17,8 @@ const partnerSchema = new mongoose.Schema({
   ifsc: String,
   experience: { type: String, default: "fresher" },
   professionalCert: String,
-
+ dob: { type: String }, // ✅ Added Date of Birth
+    avatar: { type: String }, 
   partnerId: { type: String, unique: true },
   password: { type: String, required: false }, // ✅ store password properly
   status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },

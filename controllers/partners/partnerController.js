@@ -58,3 +58,25 @@ export const getPartners = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+export const updatePartner = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner._id);
+    if (!partner) return res.status(404).json({ error: "Partner not found" });
+
+    let updates = { ...req.body };
+
+    // Handle file uploads
+    if (req.files) {
+      for (const key in req.files) {
+        updates[key] = await uploadToSupabase(req.files[key][0]);
+      }
+    }
+
+    Object.assign(partner, updates);
+    await partner.save();
+
+    res.json(partner);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
