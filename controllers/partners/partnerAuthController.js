@@ -1,70 +1,38 @@
-import otpGenerator from "otp-generator";
 import jwt from "jsonwebtoken";
 import Partner from "../../models/partners/Partner.js";
 
-/**
- * @desc   Send OTP to partner mobile number
- * @route  POST /api/partners/send-otp
- * @access Public
- */
-export const sendOtp = async (req, res) => {
-  try {
-    const { phone } = req.body;
-    if (!phone) return res.status(400).json({ message: "Phone number is required" });
+const generateToken = (id) =>
+  jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-    // Find or create partner
-    let partner = await Partner.findOne({ phone });
-    if (!partner) partner = await Partner.create({ phone });
+// Login
+export const loginPartner = async (req, res) => {
+  const { partnerId, email, password } = req.body;
+  const partner = partnerId
+    ? await Partner.findOne({ partnerId })
+    : await Partner.findOne({ email });
 
-    // Generate OTP
-    const otp = otpGenerator.generate(6, { digits: true, upperCaseAlphabets: false, lowerCaseAlphabets: false, specialChars: false });
-    partner.otp = otp;
-    partner.otpExpiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
-    await partner.save();
+  if (!partner) return res.status(401).json({ error: "Invalid credentials" });
+  if (partner.status !== "approved")
+    return res.status(403).json({ error: "Partner not approved" });
 
-    // TODO: integrate SMS provider
-    console.log(`✅ OTP for ${phone}: ${otp}`);
+  const isMatch = await partner.matchPassword(password);
+  if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
 
-    res.status(200).json({ success: true, message: "OTP sent successfully" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Failed to send OTP", error: error.message });
-  }
+  res.json({
+    _id: partner._id,
+    partnerId: partner.partnerId,
+    name: partner.name,
+    email: partner.email,
+    phone: partner.phone,
+    status: partner.status,
+    role: "partner",
+    token: generateToken(partner._id), // ✅ make sure this is _id
+  });
 };
 
-/**
- * @desc   Verify OTP for partner
- * @route  POST /api/partners/verify-otp
- * @access Public
- */
-export const verifyOtp = async (req, res) => {
-  try {
-    const { phone, otp } = req.body;
-    if (!phone || !otp) return res.status(400).json({ message: "Phone and OTP are required" });
-
-    const partner = await Partner.findOne({ phone });
-    if (!partner) return res.status(400).json({ message: "Partner not found" });
-
-    if (partner.otp !== otp || partner.otpExpiresAt < Date.now()) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
-    }
-
-    // OTP verified
-    partner.isVerified = true;
-    partner.otp = null;
-    partner.otpExpiresAt = null;
-    await partner.save();
-
-    // Issue JWT
-    const token = jwt.sign(
-      { id: partner._id, phone: partner.phone, role: partner.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.status(200).json({ success: true, message: "OTP verified successfully", token });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Failed to verify OTP", error: error.message });
-  }
+// Get profile
+export const getPartnerProfile = async (req, res) => {
+  const partner = await Partner.findById(req.partner._id).select("-password");
+  if (!partner) return res.status(404).json({ error: "Partner not found" });
+  res.json(partner);
 };

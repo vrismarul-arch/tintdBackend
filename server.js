@@ -1,195 +1,200 @@
-    import express from "express";
-    import cors from "cors";
-    import dotenv from "dotenv";
-    import { createServer } from "http";
-    import { Server } from "socket.io";
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
-    // DB connection
-    import connectDB from "./config/db.js";
+// DB connection
+import connectDB from "./config/db.js";
 
-    // Routes
-    import authRoutes from "./routes/authRoutes.js";
-    import profileRoutes from "./routes/profileRoutes.js";
-    import cartRoutes from "./routes/cartRoutes.js";
-    import bookingRoutes from "./routes/bookingRoutes.js";
-    import adminRoutes from "./routes/adminRoutes.js";
-    import serviceDrawerRoutes from "./routes/serviceDrawerRoutes.js";
-    import subCategoryRoutes from "./routes/subCategoryRoutes.js";
-    import varietyRoutes from "./routes/varietyRoutes.js";
-    import bannerRoutes from "./routes/bannerRoutes.js";
-    import paymentRoutes from "./routes/paymentRoutes.js";
-    import adminBookingRoutes from "./routes/admin/adminBookingRoutes.js";
-import partnerRoutes from "./routes/partners/partnerRoutes.js";    // Models for Socket.IO
-    import Cart from "./models/Cart.js";
-    import Service from "./models/Service.js";
+// Routes
+import authRoutes from "./routes/authRoutes.js";
+import profileRoutes from "./routes/profileRoutes.js";
+import cartRoutes from "./routes/cartRoutes.js";
+import bookingRoutes from "./routes/bookingRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
+import serviceDrawerRoutes from "./routes/serviceDrawerRoutes.js";
+import subCategoryRoutes from "./routes/subCategoryRoutes.js";
+import varietyRoutes from "./routes/varietyRoutes.js";
+import bannerRoutes from "./routes/bannerRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
+import adminBookingRoutes from "./routes/admin/adminBookingRoutes.js";
+import partnerRoutes from "./routes/partners/partnerRoutes.js"; // login/profile
+import partnerOnboardingRoutes from "./routes/partners/partnerOnboardingRoutes.js"; // submit/getPartners
+import adminPartnerRoutes from "./routes/partners/adminPartnerRoutes.js";
 
-    dotenv.config();
+// Models for Socket.IO
+import Cart from "./models/Cart.js";
+import Service from "./models/Service.js";
 
-    // =============================
-    // 🔌 Connect MongoDB
-    // =============================
-    connectDB();
+dotenv.config();
 
-    const app = express();
+// =============================
+// 🔌 Connect MongoDB
+// =============================
+connectDB();
 
-    // =============================
-    // 🌐 CORS Configuration
-    // =============================
-    const allowedOrigins = [
-      "http://localhost:5173", 
-      "https://tintd.netlify.app",
-    ];
+const app = express();
 
-    app.use(
-      cors({
-        origin: function (origin, callback) {
-          if (!origin) return callback(null, true); // allow Postman / curl
-          if (!allowedOrigins.includes(origin)) {
-            const msg = `🚫 CORS blocked: Origin not allowed -> ${origin}`;
-            return callback(new Error(msg), false);
-          }
-          return callback(null, true);
-        },
-        methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-        credentials: true,
-      })
-    );
+// =============================
+// 🌐 CORS Configuration
+// =============================
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://tintd.netlify.app",
+];
 
-    // =============================
-    // 📦 Middleware
-    // =============================
-    app.use(express.json({ limit: "2mb" }));
-    app.use(express.urlencoded({ extended: true }));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true); // allow Postman/curl
+      if (!allowedOrigins.includes(origin)) {
+        const msg = `🚫 CORS blocked: Origin not allowed -> ${origin}`;
+        return callback(new Error(msg), false);
+      }
+      return callback(null, true);
+    },
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    credentials: true,
+  })
+);
 
-    // =============================
-    // 🚏 API Routes
-    // =============================
-    app.use("/api/auth", authRoutes);
-    app.use("/api/profile", profileRoutes);
-    app.use("/api/cart", cartRoutes);
-    app.use("/api/bookings", bookingRoutes);
-    app.use("/api/admin", adminRoutes);
-    app.use("/api/admin/bookings", adminBookingRoutes);
-    app.use("/api/admin/service-drawers", serviceDrawerRoutes);
-    app.use("/api/admin/subcategories", subCategoryRoutes);
-    app.use("/api/admin/varieties", varietyRoutes);
-    app.use("/api/admin/banners", bannerRoutes);
-    app.use("/api/payment", paymentRoutes);
+// =============================
+// 📦 Middleware
+// =============================
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true }));
 
+// =============================
+// 🚏 API Routes
+// =============================
+app.use("/api/auth", authRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/cart", cartRoutes);
+app.use("/api/bookings", bookingRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/admin/bookings", adminBookingRoutes);
+app.use("/api/admin/service-drawers", serviceDrawerRoutes);
+app.use("/api/admin/subcategories", subCategoryRoutes);
+app.use("/api/admin/varieties", varietyRoutes);
+app.use("/api/admin/banners", bannerRoutes);
+app.use("/api/payment", paymentRoutes);
 
-    /* partner========================================================== */
-app.use("/api/partners", partnerRoutes);
+// ✅ Partner
+app.use("/api/partners", partnerRoutes);             // login + profile
+app.use("/api/partners", partnerOnboardingRoutes);   // onboarding submit + list
+app.use("/api/admin/partners", adminPartnerRoutes);  // Admin approving partners
 
+// =============================
+// 🩺 Health check route
+// =============================
+app.get("/", (_req, res) => {
+  res.send("Salon Booking API is running ✅");
+});
 
+// =============================
+// 🔊 Socket.IO (Cart Updates)
+// =============================
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+});
 
-    // Health check route
-    app.get("/", (_req, res) => {
-      res.send("Salon Booking API is running ✅");
-    });
+// Emit cart to a user
+const emitCart = async (userId) => {
+  const cart = await Cart.findOne({ user: userId }).populate("items.service");
+  io.to(userId.toString()).emit("cartUpdated", cart || { user: userId, items: [] });
+};
 
-    // =============================
-    // 🔊 Socket.IO (Cart Updates)
-    // =============================
-    const httpServer = createServer(app);
-    const io = new Server(httpServer, {
-      cors: {
-        origin: allowedOrigins,
-        methods: ["GET", "POST"],
-        credentials: true,
-      },
-    });
+io.on("connection", (socket) => {
+  console.log("🟢 Socket connected:", socket.id);
 
-    // Emit cart to a user
-    const emitCart = async (userId) => {
-      const cart = await Cart.findOne({ user: userId }).populate("items.service");
-      io.to(userId.toString()).emit("cartUpdated", cart || { user: userId, items: [] });
-    };
+  // Join user cart room
+  socket.on("joinCart", ({ userId }) => {
+    if (!userId) return;
+    socket.join(userId.toString());
+    console.log(`👤 ${socket.id} joined room for user: ${userId}`);
+  });
 
-    io.on("connection", (socket) => {
-      console.log("🟢 Socket connected:", socket.id);
+  // Get cart
+  socket.on("getCart", async ({ userId }) => {
+    if (!userId) return;
+    try {
+      await emitCart(userId);
+    } catch (err) {
+      io.to(userId.toString()).emit("cartError", "Unable to load cart");
+    }
+  });
 
-      // Join user cart room
-      socket.on("joinCart", ({ userId }) => {
-        if (!userId) return;
-        socket.join(userId.toString());
-        console.log(`👤 ${socket.id} joined room for user: ${userId}`);
-      });
+  // Add item to cart
+  socket.on("addToCart", async ({ userId, serviceId, quantity = 1 }) => {
+    try {
+      if (!userId || !serviceId) return;
+      const service = await Service.findById(serviceId);
+      if (!service) return io.to(userId.toString()).emit("cartError", "Service not found");
 
-      // Get cart
-      socket.on("getCart", async ({ userId }) => {
-        if (!userId) return;
-        try {
-          await emitCart(userId);
-        } catch (err) {
-          io.to(userId.toString()).emit("cartError", "Unable to load cart");
-        }
-      });
+      let cart = await Cart.findOne({ user: userId });
+      if (!cart) cart = new Cart({ user: userId, items: [] });
 
-      // Add item to cart
-      socket.on("addToCart", async ({ userId, serviceId, quantity = 1 }) => {
-        try {
-          if (!userId || !serviceId) return;
-          const service = await Service.findById(serviceId);
-          if (!service) return io.to(userId.toString()).emit("cartError", "Service not found");
+      const existing = cart.items.find((i) => i.service.toString() === serviceId);
+      if (existing) existing.quantity += Number(quantity) || 1;
+      else cart.items.push({ service: serviceId, quantity: Number(quantity) || 1 });
 
-          let cart = await Cart.findOne({ user: userId });
-          if (!cart) cart = new Cart({ user: userId, items: [] });
+      await cart.save();
+      await emitCart(userId);
+    } catch (err) {
+      io.to(userId.toString()).emit("cartError", "Unable to add to cart");
+    }
+  });
 
-          const existing = cart.items.find((i) => i.service.toString() === serviceId);
-          if (existing) existing.quantity += Number(quantity) || 1;
-          else cart.items.push({ service: serviceId, quantity: Number(quantity) || 1 });
+  // Update item quantity
+  socket.on("updateQuantity", async ({ userId, serviceId, quantity }) => {
+    try {
+      if (!userId || !serviceId) return;
+      let cart = await Cart.findOne({ user: userId });
+      if (!cart) return;
 
-          await cart.save();
-          await emitCart(userId);
-        } catch (err) {
-          io.to(userId.toString()).emit("cartError", "Unable to add to cart");
-        }
-      });
+      const item = cart.items.find((i) => i.service.toString() === serviceId);
+      if (item) {
+        const q = parseInt(quantity, 10);
+        item.quantity = Number.isNaN(q) || q < 1 ? 1 : q;
+        await cart.save();
+      }
 
-      // Update item quantity
-      socket.on("updateQuantity", async ({ userId, serviceId, quantity }) => {
-        try {
-          if (!userId || !serviceId) return;
-          let cart = await Cart.findOne({ user: userId });
-          if (!cart) return;
+      await emitCart(userId);
+    } catch (err) {
+      io.to(userId.toString()).emit("cartError", "Unable to update quantity");
+    }
+  });
 
-          const item = cart.items.find((i) => i.service.toString() === serviceId);
-          if (item) {
-            const q = parseInt(quantity, 10);
-            item.quantity = Number.isNaN(q) || q < 1 ? 1 : q;
-            await cart.save();
-          }
+  // Remove item from cart
+  socket.on("removeFromCart", async ({ userId, serviceId }) => {
+    try {
+      if (!userId || !serviceId) return;
+      let cart = await Cart.findOne({ user: userId });
+      if (!cart) return;
 
-          await emitCart(userId);
-        } catch (err) {
-          io.to(userId.toString()).emit("cartError", "Unable to update quantity");
-        }
-      });
+      cart.items = cart.items.filter((i) => i.service.toString() !== serviceId);
+      await cart.save();
+      await emitCart(userId);
+    } catch (err) {
+      io.to(userId.toString()).emit("cartError", "Unable to remove item");
+    }
+  });
 
-      // Remove item from cart
-      socket.on("removeFromCart", async ({ userId, serviceId }) => {
-        try {
-          if (!userId || !serviceId) return;
-          let cart = await Cart.findOne({ user: userId });
-          if (!cart) return;
+  socket.on("disconnect", () => {
+    console.log("🔴 Socket disconnected:", socket.id);
+  });
+});
 
-          cart.items = cart.items.filter((i) => i.service.toString() !== serviceId);
-          await cart.save();
-          await emitCart(userId);
-        } catch (err) {
-          io.to(userId.toString()).emit("cartError", "Unable to remove item");
-        }
-      });
-
-      socket.on("disconnect", () => {
-        console.log("🔴 Socket disconnected:", socket.id);
-      });
-    });
-
-    // =============================
-    // 🚀 Start Server
-    // =============================
-    const PORT = process.env.PORT || 5000;
-    httpServer.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
-    });
+// =============================
+// 🚀 Start Server
+// =============================
+const PORT = process.env.PORT || 5000;
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});

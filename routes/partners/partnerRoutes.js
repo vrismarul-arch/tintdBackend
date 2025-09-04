@@ -1,19 +1,13 @@
 import express from "express";
-import { submitStep, getPartners, upload } from "../../controllers/partners/partnerController.js";
+import { loginPartner, getPartnerProfile } from "../../controllers/partners/partnerAuthController.js";
+import { partnerProtect } from "../../middleware/partnerAuthMiddleware.js";
 
 const router = express.Router();
 
-router.post(
-  "/submit",
-  upload.fields([
-    { name: "aadhaarFront" },
-    { name: "aadhaarBack" },
-    { name: "pan" },
-    { name: "professionalCert" },
-  ]),
-  submitStep
-);
+// Public login
+router.post("/login", loginPartner);
 
-router.get("/", getPartners);
+// Protected profile
+router.get("/profile", partnerProtect, getPartnerProfile);
 
 export default router;

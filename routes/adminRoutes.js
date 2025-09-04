@@ -43,6 +43,9 @@ import {
   getAdminProfile,
 } from "../controllers/adminController.js";
 
+// Partner routes
+import partnerRoutes from "./partners/partnerRoutes.js";
+
 // Middleware
 import { protect, admin } from "../middleware/authMiddleware.js";
 
@@ -55,9 +58,17 @@ router.put("/categories/:id", categoryUpload.single("image"), updateCategory);
 router.delete("/categories/:id", deleteCategory);
 
 /* ----------------- SubCategories ----------------- */
-router.post("/subcategories", subCategoryUpload.single("image"), createSubCategory);
+router.post(
+  "/subcategories",
+  subCategoryUpload.single("image"),
+  createSubCategory
+);
 router.get("/subcategories", getSubCategories);
-router.put("/subcategories/:id", subCategoryUpload.single("image"), updateSubCategory);
+router.put(
+  "/subcategories/:id",
+  subCategoryUpload.single("image"),
+  updateSubCategory
+);
 router.delete("/subcategories/:id", deleteSubCategory);
 
 /* ----------------- Varieties ----------------- */
@@ -81,5 +92,8 @@ router.get("/bookings/:id", getBookingById);
 
 /* ----------------- Admin Profile ----------------- */
 router.get("/profile", protect, admin, getAdminProfile);
+
+/* ----------------- Partner Management ----------------- */
+router.use("/partners", partnerRoutes);
 
 export default router;
