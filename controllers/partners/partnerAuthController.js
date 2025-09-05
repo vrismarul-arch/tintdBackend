@@ -1,11 +1,10 @@
 import jwt from "jsonwebtoken";
 import multer from "multer";
-import path from "path";
 import Partner from "../../models/partners/Partner.js";
 import supabase from "../../config/supabase.js";
 
 // =============================
-// 📌 Multer Setup
+// 📌 Multer Setup (store in memory before upload to Supabase)
 // =============================
 const storage = multer.memoryStorage();
 export const upload = multer({ storage });
@@ -16,17 +15,19 @@ export const upload = multer({ storage });
 const uploadToSupabase = async (file) => {
   const fileName = `${Date.now()}-${file.originalname}`;
   const { error } = await supabase.storage
-    .from("tintd")
+    .from("tintd") // 👈 bucket name
     .upload(fileName, file.buffer, {
       contentType: file.mimetype,
       upsert: true,
     });
+
   if (error) throw error;
+
   return `${process.env.SUPABASE_URL}/storage/v1/object/public/tintd/${fileName}`;
 };
 
 // =============================
-// 📌 JWT Token
+// 📌 JWT Token Helper
 // =============================
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
@@ -35,37 +36,73 @@ const generateToken = (id) =>
 // 📌 Login Partner
 // =============================
 export const loginPartner = async (req, res) => {
-  const { partnerId, email, password } = req.body;
-  const partner = partnerId
-    ? await Partner.findOne({ partnerId })
-    : await Partner.findOne({ email });
+  try {
+    const { partnerId, email, password } = req.body;
 
-  if (!partner) return res.status(401).json({ error: "Invalid credentials" });
-  if (partner.status !== "approved")
-    return res.status(403).json({ error: "Partner not approved" });
+    const partner = partnerId
+      ? await Partner.findOne({ partnerId })
+      : await Partner.findOne({ email });
 
-  const isMatch = await partner.matchPassword(password);
-  if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
+    if (!partner) return res.status(401).json({ error: "Invalid credentials" });
+    if (partner.status !== "approved")
+      return res.status(403).json({ error: "Partner not approved" });
 
-  res.json({
-    _id: partner._id,
-    partnerId: partner.partnerId,
-    name: partner.name,
-    email: partner.email,
-    phone: partner.phone,
-    status: partner.status,
-    role: "partner",
-    token: generateToken(partner._id),
-  });
+    const isMatch = await partner.matchPassword(password);
+    if (!isMatch) return res.status(401).json({ error: "Invalid credentials" });
+
+    res.json({
+      _id: partner._id,
+      partnerId: partner.partnerId,
+      name: partner.name,
+      email: partner.email,
+      phone: partner.phone,
+      status: partner.status,
+      avatar: partner.avatar || null, // ✅ fixed avatar field
+      role: "partner",
+      token: generateToken(partner._id),
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
 };
 
 // =============================
-// 📌 Get Profile
+// 📌 Get Partner Profile
 // =============================
 export const getPartnerProfile = async (req, res) => {
-  const partner = await Partner.findById(req.partner._id).select("-password");
-  if (!partner) return res.status(404).json({ error: "Partner not found" });
-  res.json(partner);
+  try {
+    const partner = await Partner.findById(req.partner._id).select("-password");
+    if (!partner) return res.status(404).json({ error: "Partner not found" });
+
+    res.json({
+     _id: partner._id,
+      partnerId: partner.partnerId,
+      name: partner.name,
+      email: partner.email,
+      phone: partner.phone,
+      city: partner.city,
+      gender: partner.gender,
+      profession: partner.profession,
+      experience: partner.experience,
+      status: partner.status,
+      avatar: partner.avatar || null,
+      dob: partner.dob,
+      bankName: partner.bankName,
+      accountNumber: partner.accountNumber,
+      ifsc: partner.ifsc,
+      aadhaarFront: partner.aadhaarFront,
+      aadhaarBack: partner.aadhaarBack,
+      pan: partner.pan,
+      professionalCert: partner.professionalCert,
+      stepStatus: partner.stepStatus || {},
+      createdAt: partner.createdAt,
+      updatedAt: partner.updatedAt, // ✅ consistent return
+    });
+  } catch (error) {
+    console.error("Profile error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
 };
 
 // =============================
@@ -78,7 +115,7 @@ export const updatePartner = async (req, res) => {
 
     let updates = { ...req.body };
 
-    // ❌ Ensure partnerId & status cannot be edited
+    // ❌ Prevent editing system fields
     delete updates.partnerId;
     delete updates.status;
 
@@ -92,7 +129,36 @@ export const updatePartner = async (req, res) => {
     Object.assign(partner, updates);
     await partner.save();
 
-    res.json(partner);
+    res.json({
+      _id: partner._id,
+      partnerId: partner.partnerId,
+      name: partner.name,
+      email: partner.email,
+      phone: partner.phone,
+      status: partner.status,
+      avatar: partner.avatar || null, _id: partner._id,
+      partnerId: partner.partnerId,
+      name: partner.name,
+      email: partner.email,
+      phone: partner.phone,
+      city: partner.city,
+      gender: partner.gender,
+      profession: partner.profession,
+      experience: partner.experience,
+      status: partner.status,
+      avatar: partner.avatar || null,
+      dob: partner.dob,
+      bankName: partner.bankName,
+      accountNumber: partner.accountNumber,
+      ifsc: partner.ifsc,
+      aadhaarFront: partner.aadhaarFront,
+      aadhaarBack: partner.aadhaarBack,
+      pan: partner.pan,
+      professionalCert: partner.professionalCert,
+      stepStatus: partner.stepStatus || {},
+      createdAt: partner.createdAt,
+      updatedAt: partner.updatedAt,// ✅ always return avatar
+    });
   } catch (error) {
     console.error("Update error:", error);
     res.status(500).json({ error: "Server error" });

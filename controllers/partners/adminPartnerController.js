@@ -1,6 +1,6 @@
 import Partner from "../../models/partners/Partner.js";
 import nodemailer from "nodemailer";
-
+import Counter from "../../models/partners/Counter.js";
 /* ---------------- Get All Partners ---------------- */
 export const getAllPartners = async (req, res) => {
   try {
@@ -19,16 +19,23 @@ export const approvePartner = async (req, res) => {
     const partner = await Partner.findById(req.params.id);
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
-    const partnerId = "tdpartner-" + String(partner._id).slice(-3);
+    // --- Generate Auto Increment Partner ID ---
+    const counter = await Counter.findOneAndUpdate(
+      { name: "partnerId" },
+      { $inc: { seq: 1 } },
+      { new: true, upsert: true }
+    );
+
+    const partnerId = "tdpartner-" + String(counter.seq).padStart(3, "0");
     const defaultPassword = "tintd@123456";
 
     partner.partnerId = partnerId;
     partner.status = "approved";
-    partner.password = defaultPassword; // ✅ hashed by schema
+    partner.password = defaultPassword; // hashed by schema
 
     await partner.save();
 
-    // ---------------- Send Approval Email ----------------
+    // --- Send Approval Email ---
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
