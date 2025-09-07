@@ -22,6 +22,7 @@ const partnerSchema = new mongoose.Schema({
   partnerId: { type: String, unique: true },
   password: { type: String, required: false }, // ✅ store password properly
   status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    dutyStatus: { type: Boolean, default: false },
 
   stepStatus: {
     profileSetup: { type: Boolean, default: false },

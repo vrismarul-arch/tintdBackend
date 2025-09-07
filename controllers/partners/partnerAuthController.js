@@ -15,7 +15,7 @@ export const upload = multer({ storage });
 const uploadToSupabase = async (file) => {
   const fileName = `${Date.now()}-${file.originalname}`;
   const { error } = await supabase.storage
-    .from("tintd") // 👈 bucket name
+    .from("tintd")
     .upload(fileName, file.buffer, {
       contentType: file.mimetype,
       upsert: true,
@@ -57,7 +57,8 @@ export const loginPartner = async (req, res) => {
       email: partner.email,
       phone: partner.phone,
       status: partner.status,
-      avatar: partner.avatar || null, // ✅ fixed avatar field
+      dutyStatus: partner.dutyStatus,
+      avatar: partner.avatar || null,
       role: "partner",
       token: generateToken(partner._id),
     });
@@ -76,7 +77,7 @@ export const getPartnerProfile = async (req, res) => {
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
     res.json({
-     _id: partner._id,
+      _id: partner._id,
       partnerId: partner.partnerId,
       name: partner.name,
       email: partner.email,
@@ -86,6 +87,7 @@ export const getPartnerProfile = async (req, res) => {
       profession: partner.profession,
       experience: partner.experience,
       status: partner.status,
+      dutyStatus: partner.dutyStatus,
       avatar: partner.avatar || null,
       dob: partner.dob,
       bankName: partner.bankName,
@@ -97,7 +99,7 @@ export const getPartnerProfile = async (req, res) => {
       professionalCert: partner.professionalCert,
       stepStatus: partner.stepStatus || {},
       createdAt: partner.createdAt,
-      updatedAt: partner.updatedAt, // ✅ consistent return
+      updatedAt: partner.updatedAt,
     });
   } catch (error) {
     console.error("Profile error:", error);
@@ -126,6 +128,12 @@ export const updatePartner = async (req, res) => {
       }
     }
 
+    // ✅ Handle dutyStatus separately if present
+    if (updates.hasOwnProperty("dutyStatus")) {
+      partner.dutyStatus = updates.dutyStatus;
+      delete updates.dutyStatus;
+    }
+
     Object.assign(partner, updates);
     await partner.save();
 
@@ -135,17 +143,12 @@ export const updatePartner = async (req, res) => {
       name: partner.name,
       email: partner.email,
       phone: partner.phone,
-      status: partner.status,
-      avatar: partner.avatar || null, _id: partner._id,
-      partnerId: partner.partnerId,
-      name: partner.name,
-      email: partner.email,
-      phone: partner.phone,
       city: partner.city,
       gender: partner.gender,
       profession: partner.profession,
       experience: partner.experience,
       status: partner.status,
+      dutyStatus: partner.dutyStatus,
       avatar: partner.avatar || null,
       dob: partner.dob,
       bankName: partner.bankName,
@@ -157,10 +160,28 @@ export const updatePartner = async (req, res) => {
       professionalCert: partner.professionalCert,
       stepStatus: partner.stepStatus || {},
       createdAt: partner.createdAt,
-      updatedAt: partner.updatedAt,// ✅ always return avatar
+      updatedAt: partner.updatedAt,
     });
   } catch (error) {
     console.error("Update error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+// =============================
+// 📌 Toggle Duty ON/OFF
+// =============================
+export const toggleDuty = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner._id);
+    if (!partner) return res.status(404).json({ error: "Partner not found" });
+
+    partner.dutyStatus = !partner.dutyStatus;
+    await partner.save();
+
+    res.json({ dutyStatus: partner.dutyStatus });
+  } catch (error) {
+    console.error("Duty toggle error:", error);
     res.status(500).json({ error: "Server error" });
   }
 };

@@ -3,19 +3,15 @@ import {
   loginPartner,
   getPartnerProfile,
   updatePartner,
-} from "../../controllers/partners/partnerAuthController.js";
+  toggleDuty,
+} from "../../controllers/partners/partnerController.js";
 import { partnerProtect } from "../../middleware/partnerAuthMiddleware.js";
-import { upload } from "../../controllers/partners/partnerAuthController.js"; // ✅ bring upload here
+import { upload } from "../../controllers/partners/partnerController.js";
 
 const router = express.Router();
 
-// Public login
 router.post("/login", loginPartner);
-
-// Protected profile
 router.get("/profile", partnerProtect, getPartnerProfile);
-
-// Update partner (with file upload)
 router.put(
   "/update",
   partnerProtect,
@@ -28,5 +24,8 @@ router.put(
   ]),
   updatePartner
 );
+
+// ✅ Duty toggle route
+router.put("/duty", partnerProtect, toggleDuty);
 
 export default router;
