@@ -73,7 +73,7 @@ app.use("/api/admin/subcategories", subCategoryRoutes);
 app.use("/api/admin/varieties", varietyRoutes);
 app.use("/api/admin/banners", bannerRoutes);
 app.use("/api/admin/partners", adminPartnerRoutes); // ✅ only once
-
+app.use("/api/payment", paymentRoutes);
 // Partner routes
 app.use("/api/partners", partnerRoutes);
 app.use("/api/partners/onboarding", partnerOnboardingRoutes);
