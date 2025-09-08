@@ -22,8 +22,10 @@ import adminBookingRoutes from "./routes/admin/adminBookingRoutes.js";
 import partnerRoutes from "./routes/partners/partnerRoutes.js"; 
 import partnerOnboardingRoutes from "./routes/partners/partnerOnboardingRoutes.js"; 
 import adminPartnerRoutes from "./routes/partners/adminPartnerRoutes.js";
+import partnerBookingRoutes from "./routes/partners/partnerBookingRoutes.js";
+import partnerNotificationRoutes from "./routes/partners/partnerRoutes.js";
 
-// Models for Socket.IO
+// Models
 import Cart from "./models/Cart.js";
 import Service from "./models/Service.js";
 import Booking from "./models/Booking.js";
@@ -37,25 +39,16 @@ const app = express();
 // =============================
 // 🌐 CORS Configuration
 // =============================
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://tintd.netlify.app",
-];
-
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (!allowedOrigins.includes(origin)) {
-        const msg = `🚫 CORS blocked: Origin not allowed -> ${origin}`;
-        return callback(new Error(msg), false);
-      }
-      return callback(null, true);
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-    credentials: true,
-  })
-);
+const allowedOrigins = ["http://localhost:5173", "https://tintd.netlify.app"];
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (!allowedOrigins.includes(origin)) return callback(new Error(`🚫 CORS blocked: ${origin}`), false);
+    return callback(null, true);
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  credentials: true,
+}));
 
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -77,29 +70,23 @@ app.use("/api/payment", paymentRoutes);
 
 app.use("/api/partners", partnerRoutes);
 app.use("/api/partners", partnerOnboardingRoutes);
+app.use("/api/partners/bookings", partnerBookingRoutes);
+app.use("/api/partners/notifications", partnerNotificationRoutes);
 app.use("/api/admin/partners", adminPartnerRoutes);
 
 // Health check
-app.get("/", (_req, res) => {
-  res.send("Salon Booking API is running ✅");
-});
+app.get("/", (_req, res) => res.send("Salon Booking API is running ✅"));
 
 // =============================
 // 🔊 Socket.IO Setup
 // =============================
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-  cors: {
-    origin: allowedOrigins,
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
+  cors: { origin: allowedOrigins, methods: ["GET", "POST"], credentials: true },
 });
 
-// Helper to emit updates
-const emitUpdate = (room, event, data) => {
-  io.to(room).emit(event, data);
-};
+// Emit helper
+const emitUpdate = (room, event, data) => io.to(room).emit(event, data);
 
 // =============================
 // 🔄 Socket.IO Connections
@@ -120,12 +107,7 @@ io.on("connection", (socket) => {
     emitUpdate(`user:${userId}`, "cartUpdated", cart || { user: userId, items: [] });
   };
 
-  socket.on("getCart", async ({ userId }) => {
-    if (!userId) return;
-    try { await emitCart(userId); } 
-    catch { emitUpdate(`user:${userId}`, "cartError", "Unable to load cart"); }
-  });
-
+  socket.on("getCart", async ({ userId }) => { if (!userId) return await emitCart(userId); });
   socket.on("addToCart", async ({ userId, serviceId, quantity = 1 }) => {
     try {
       if (!userId || !serviceId) return;
@@ -135,7 +117,7 @@ io.on("connection", (socket) => {
       let cart = await Cart.findOne({ user: userId });
       if (!cart) cart = new Cart({ user: userId, items: [] });
 
-      const existing = cart.items.find((i) => i.service.toString() === serviceId);
+      const existing = cart.items.find(i => i.service.toString() === serviceId);
       if (existing) existing.quantity += Number(quantity) || 1;
       else cart.items.push({ service: serviceId, quantity: Number(quantity) || 1 });
 
@@ -150,13 +132,12 @@ io.on("connection", (socket) => {
       let cart = await Cart.findOne({ user: userId });
       if (!cart) return;
 
-      const item = cart.items.find((i) => i.service.toString() === serviceId);
+      const item = cart.items.find(i => i.service.toString() === serviceId);
       if (item) {
         const q = parseInt(quantity, 10);
         item.quantity = Number.isNaN(q) || q < 1 ? 1 : q;
         await cart.save();
       }
-
       await emitCart(userId);
     } catch { emitUpdate(`user:${userId}`, "cartError", "Unable to update quantity"); }
   });
@@ -167,7 +148,7 @@ io.on("connection", (socket) => {
       let cart = await Cart.findOne({ user: userId });
       if (!cart) return;
 
-      cart.items = cart.items.filter((i) => i.service.toString() !== serviceId);
+      cart.items = cart.items.filter(i => i.service.toString() !== serviceId);
       await cart.save();
       await emitCart(userId);
     } catch { emitUpdate(`user:${userId}`, "cartError", "Unable to remove item"); }
@@ -175,13 +156,32 @@ io.on("connection", (socket) => {
 
   // BOOKING EVENTS
   socket.on("newBooking", async ({ bookingId }) => {
-    const booking = await Booking.findById(bookingId).populate("user");
+    const booking = await Booking.findById(bookingId).populate("user services.serviceId");
     if (!booking) return;
 
     // Notify user
     emitUpdate(`user:${booking.user._id}`, "bookingConfirmed", booking);
+
+    // Notify all partners of new unassigned booking
+    const notification = {
+      id: booking._id,
+      bookingId: booking._id,
+      booking,
+      text: `New booking ${booking.bookingId || booking._id} is available`,
+      createdAt: booking.createdAt,
+    };
+    io.to("partners").emit("newNotification", notification);
+
     // Notify admin
     emitUpdate("admin", "newBooking", booking);
+  });
+
+  socket.on("assignBooking", async ({ bookingId, partnerId }) => {
+    const booking = await Booking.findById(bookingId).populate("services.serviceId");
+    if (!booking) return;
+
+    // Notify the assigned partner only
+    emitUpdate(`partner:${partnerId}`, "assignedBooking", booking);
   });
 
   // PARTNER EVENTS
@@ -189,9 +189,7 @@ io.on("connection", (socket) => {
     const partner = await Partner.findById(partnerId);
     if (!partner) return;
 
-    // Notify partner
     emitUpdate(`partner:${partnerId}`, "partnerApproved", partner);
-    // Notify admin
     emitUpdate("admin", "partnerApproved", partner);
   });
 
@@ -204,6 +202,4 @@ io.on("connection", (socket) => {
 // 🚀 Start Server
 // =============================
 const PORT = process.env.PORT || 5000;
-httpServer.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-});
+httpServer.listen(PORT, () => console.log(`🚀 Server running on http://localhost:${PORT}`));

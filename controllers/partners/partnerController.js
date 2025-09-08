@@ -3,11 +3,15 @@ import multer from "multer";
 import Partner from "../../models/partners/Partner.js";
 import supabase from "../../config/supabase.js";
 
-// Multer setup
+// =============================
+// Multer Setup (Memory Storage)
+// =============================
 const storage = multer.memoryStorage();
 export const upload = multer({ storage });
 
-// Supabase upload helper
+// =============================
+// Supabase Upload Helper
+// =============================
 const uploadToSupabase = async (file) => {
   const fileName = `${Date.now()}-${file.originalname}`;
   const { error } = await supabase.storage
@@ -17,13 +21,15 @@ const uploadToSupabase = async (file) => {
   return `${process.env.SUPABASE_URL}/storage/v1/object/public/tintd/${fileName}`;
 };
 
-// JWT generator
+// =============================
+// JWT Token Generator
+// =============================
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 
-/**
- * LOGIN
- */
+// =============================
+// LOGIN
+// =============================
 export const loginPartner = async (req, res) => {
   try {
     const { partnerId, email, password } = req.body;
@@ -50,48 +56,43 @@ export const loginPartner = async (req, res) => {
       token: generateToken(partner._id),
     });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error(error);
     res.status(500).json({ error: "Server error" });
   }
 };
 
-/**
- * GET PROFILE
- */
+// =============================
+// GET PARTNER PROFILE
+// =============================
 export const getPartnerProfile = async (req, res) => {
   try {
     const partner = await Partner.findById(req.partner._id).select("-password");
     if (!partner) return res.status(404).json({ error: "Partner not found" });
-
     res.json(partner);
   } catch (error) {
-    console.error("Profile error:", error);
+    console.error(error);
     res.status(500).json({ error: "Server error" });
   }
 };
 
-/**
- * UPDATE PARTNER (profile + docs + duty toggle)
- */
+// =============================
+// UPDATE PARTNER (PROFILE / DOCS / DUTY)
+// =============================
 export const updatePartner = async (req, res) => {
   try {
     const partner = await Partner.findById(req.partner._id);
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
     let updates = { ...req.body };
-
-    // Prevent editing system fields
     delete updates.partnerId;
     delete updates.status;
 
-    // Handle file uploads
     if (req.files) {
       for (const key in req.files) {
         updates[key] = await uploadToSupabase(req.files[key][0]);
       }
     }
 
-    // Handle duty toggle
     if (updates.hasOwnProperty("dutyStatus")) {
       partner.dutyStatus = updates.dutyStatus;
       delete updates.dutyStatus;
@@ -102,14 +103,14 @@ export const updatePartner = async (req, res) => {
 
     res.json(partner);
   } catch (error) {
-    console.error("Update error:", error);
+    console.error(error);
     res.status(500).json({ error: "Server error" });
   }
 };
 
-/**
- * TOGGLE DUTY (ON/OFF)
- */
+// =============================
+// TOGGLE DUTY
+// =============================
 export const toggleDuty = async (req, res) => {
   try {
     const partner = await Partner.findById(req.partner._id);
@@ -120,18 +121,19 @@ export const toggleDuty = async (req, res) => {
 
     res.json({ dutyStatus: partner.dutyStatus });
   } catch (error) {
-    console.error("Duty toggle error:", error);
+    console.error(error);
     res.status(500).json({ error: "Server error" });
   }
 };
 
-// Submit step data
+// =============================
+// STEPWISE ONBOARDING
+// =============================
 export const submitStep = async (req, res) => {
   try {
     const { step, partnerId } = req.body;
     let data = { ...req.body };
 
-    // Handle uploaded files
     if (req.files) {
       for (const key in req.files) {
         data[key] = await uploadToSupabase(req.files[key][0]);
@@ -161,7 +163,11 @@ export const submitStep = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
-export const getPartners = async (req, res) => {
+
+// =============================
+// GET ALL PARTNERS (ADMIN)
+// =============================
+export const getPartners = async (_req, res) => {
   try {
     const partners = await Partner.find().sort({ createdAt: -1 });
     res.json(partners);

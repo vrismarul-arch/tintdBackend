@@ -1,32 +1,32 @@
 import express from "express";
-import { 
-  createBooking, 
-  getUserBookings, 
-  deleteBooking,  
+import { protect } from "../middleware/authMiddleware.js";
+import {
+  createBooking,
+  getUserBookings,
+  getAllBookings,
+  updateBooking,
+  deleteBooking,
   fixOldBookings,
-  getAllBookings, // 🟢 Add this import
-  updateBooking // 🟢 Add this import
+  pickOrder,
+  confirmBooking,
+  completeBooking
 } from "../controllers/bookingController.js";
-import { protect, } from "../middleware/authMiddleware.js"; // 🟢 Add 'admin' middleware
 
 const router = express.Router();
 
-// 🟢 Create a booking (COD / Online)
 router.post("/", protect, createBooking);
-
-// 🟢 Get logged-in user's bookings
 router.get("/my", protect, getUserBookings);
-
-// 🟢 Get all bookings for admin
-router.get("/admin", protect,  getAllBookings);
-
-// 🟢 Update a booking status and assignment
-router.put("/:id", protect,  updateBooking);
-
-// 🟢 Delete a booking
+router.get("/admin", protect, getAllBookings);
+router.put("/:id", protect, updateBooking);
 router.delete("/:id", protect, deleteBooking);
-
-// 🟢 Fix old bookings with null user
 router.post("/fix-old", protect, fixOldBookings);
+
+// ✅ New booking action routes
+router.put("/:id/pick", protect, pickOrder);
+router.put("/:id/confirm", protect, confirmBooking);
+router.put("/:id/complete", protect, completeBooking);
+
+// ✅ Add this route if you want to support "approve" path from frontend
+router.put("/:id/approve", protect, confirmBooking);
 
 export default router;

@@ -82,7 +82,7 @@ export const verifyPayment = async (req, res) => {
       await payment.save();
 
       return res.json({ success: true, message: "Payment verified", booking });
-    } else {
+    } else {  
       await Payment.findOneAndUpdate(
         { orderId: razorpay_order_id },
         { status: "failed" }
