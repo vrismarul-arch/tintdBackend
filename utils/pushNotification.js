@@ -15,6 +15,7 @@ if (!admin.apps.length) {
     }),
   });
 }
+/*  */
 
 /**
  * Send push notification to a device token
