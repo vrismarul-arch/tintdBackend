@@ -1,7 +1,8 @@
 import Partner from "../../models/partners/Partner.js";
-import nodemailer from "nodemailer";
 import Counter from "../../models/partners/Counter.js";
-/* ---------------- Get All Partners ---------------- */
+import nodemailer from "nodemailer";
+
+// Get all partners (Admin)
 export const getAllPartners = async (req, res) => {
   try {
     const partners = await Partner.find().sort({ createdAt: -1 });
@@ -10,16 +11,12 @@ export const getAllPartners = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
-
-/* ---------------- Approve Partner ---------------- */
-// ...
-/* ---------------- Approve Partner ---------------- */
+// Approve partner
 export const approvePartner = async (req, res) => {
   try {
     const partner = await Partner.findById(req.params.id);
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
-    // --- Generate Auto Increment Partner ID ---
     const counter = await Counter.findOneAndUpdate(
       { name: "partnerId" },
       { $inc: { seq: 1 } },
@@ -31,11 +28,10 @@ export const approvePartner = async (req, res) => {
 
     partner.partnerId = partnerId;
     partner.status = "approved";
-    partner.password = defaultPassword; // hashed by schema
+    partner.password = defaultPassword; // ensure schema hashes it
 
     await partner.save();
 
-    // --- Send Approval Email ---
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -48,40 +44,27 @@ export const approvePartner = async (req, res) => {
       from: `"Tintd Team" <${process.env.MAIL_USER}>`,
       to: partner.email,
       subject: "✅ Partner Application Approved",
-      html: `
-        <h2>Congratulations ${partner.name}!</h2>
-        <p>Your partner application has been approved.</p>
-        <p><strong>Partner ID:</strong> ${partner.partnerId}</p>
-        <p><strong>Temporary Password:</strong> ${defaultPassword}</p>
-        <p>Please log in and change your password immediately.</p>
-        <br/>
-        <p>Thanks,<br/>Tintd Team 💜</p>
-      `,
+      html: `<h2>Congrats ${partner.name}!</h2>
+             <p>Partner ID: ${partner.partnerId}</p>
+             <p>Temporary Password: ${defaultPassword}</p>`,
     });
 
-    res.json({
-      message: "Partner approved successfully and email sent",
-      partnerId: partner.partnerId,
-      defaultPassword,
-    });
+    res.json({ message: "Partner approved", partnerId, defaultPassword });
   } catch (err) {
-    console.error("❌ Approve partner error:", err.message);
+    console.error(err);
     res.status(500).json({ error: "Approval failed" });
   }
 };
 
-
-/* ---------------- Reject Partner ---------------- */
+// Reject partner
 export const rejectPartner = async (req, res) => {
   try {
-    const { id } = req.params;
-    const partner = await Partner.findById(id);
+    const partner = await Partner.findById(req.params.id);
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
     partner.status = "rejected";
     await partner.save();
 
-    // Send rejection email
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -94,18 +77,13 @@ export const rejectPartner = async (req, res) => {
       from: `"Tintd Team" <${process.env.MAIL_USER}>`,
       to: partner.email,
       subject: "❌ Partner Application Rejected",
-      html: `
-        <h2>Hello ${partner.name},</h2>
-        <p>We regret to inform you that your partner application was not approved.</p>
-        <p>If you believe this is a mistake, please contact support.</p>
-        <br/>
-        <p>Thanks,<br/>Tintd Team 💜</p>
-      `,
+      html: `<h2>Hello ${partner.name}</h2>
+             <p>Your application was rejected.</p>`,
     });
 
-    res.json({ message: "Partner rejected and email sent", partner });
+    res.json({ message: "Partner rejected", partner });
   } catch (err) {
-    console.error("Rejection Error:", err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };

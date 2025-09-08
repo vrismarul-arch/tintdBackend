@@ -48,6 +48,5 @@ router.post("/submit-step", partnerProtect, upload.fields([
 ]), submitStep);
 
 // Admin: Get all partners
-router.get("/", partnerProtect, getPartners);
 
 export default router;
