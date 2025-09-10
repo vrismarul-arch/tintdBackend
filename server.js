@@ -62,7 +62,7 @@ app.use(express.urlencoded({ extended: true }));
 // =============================
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
-app.use("/api/cart", cartRoutes);
+app.use("/api/", cartRoutes);
 app.use("/api/bookings", bookingRoutes);
 
 // Admin routes
