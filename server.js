@@ -64,7 +64,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/", cartRoutes);
 app.use("/api/bookings", bookingRoutes);
-
+/* dsfd */
 // Admin routes
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/bookings", adminBookingRoutes);
