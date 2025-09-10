@@ -116,8 +116,21 @@ export const updateService = async (req, res) => {
 // GET ALL
 export const getServices = async (req, res) => {
   try {
-    const { category } = req.query;
-    const query = category ? { category } : {};
+    const { category, search } = req.query;
+    let query = {};
+
+    // Filter by category if provided
+    if (category) {
+      query.category = category;
+    }
+
+    // Filter by search query if provided
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },        // Match service name
+        { description: { $regex: search, $options: "i" } }, // Match service description
+      ];
+    }
 
     const services = await Service.find(query)
       .populate("category", "name description imageUrl")
@@ -130,6 +143,7 @@ export const getServices = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
 
 // GET ONE BY ID
 export const getServiceById = async (req, res) => {

@@ -25,6 +25,7 @@ import partnerRoutes from "./routes/partners/partnerRoutes.js";
 import partnerOnboardingRoutes from "./routes/partners/partnerOnboardingRoutes.js";
 import partnerBookingRoutes from "./routes/partners/partnerBookingRoutes.js";
 import partnerNotificationRoutes from "./routes/partners/partnerRoutes.js";
+import serviceRoutes from "./routes/serviceRoutes.js";
 
 // Models
 import Cart from "./models/Cart.js";
@@ -74,6 +75,8 @@ app.use("/api/admin/varieties", varietyRoutes);
 app.use("/api/admin/banners", bannerRoutes);
 app.use("/api/admin/partners", adminPartnerRoutes); // ✅ only once
 app.use("/api/payment", paymentRoutes);
+app.use("/api/services", serviceRoutes);
+
 // Partner routes
 app.use("/api/partners", partnerRoutes);
 app.use("/api/partners/onboarding", partnerOnboardingRoutes);

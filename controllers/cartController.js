@@ -87,3 +87,14 @@ export const updateQuantity = asyncHandler(async (req, res) => {
 
   res.json({ items: cart.items });
 });
+
+
+export const clearCart = async (req, res) => {
+  try {
+    await Cart.deleteMany({ user: req.user._id }); // remove all items for the logged-in user
+    res.status(200).json({ success: true, message: "Cart cleared successfully" });
+  } catch (err) {
+    console.error("Clear cart error:", err);
+    res.status(500).json({ success: false, error: "Failed to clear cart" });
+  }
+};

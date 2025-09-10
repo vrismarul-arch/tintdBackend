@@ -4,7 +4,8 @@ import {
   addToCart, 
   getCart, 
   updateQuantity, 
-  removeFromCart 
+  removeFromCart, 
+  clearCart  // ✅ Import clearCart controller
 } from "../controllers/cartController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
@@ -21,5 +22,9 @@ router.put("/cart/:serviceId", protect, updateQuantity);
 
 // Remove item
 router.delete("/cart/:serviceId", protect, removeFromCart);
+
+// ✅ Clear entire cart
+router.delete("/cart", protect, clearCart);
+
 
 export default router;
