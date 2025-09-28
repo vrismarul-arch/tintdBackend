@@ -24,7 +24,7 @@ const bookingSchema = new mongoose.Schema(
       enum: ["pending", "picked", "confirmed", "completed", "cancelled"],
       default: "pending",
     },
-    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Partner", default: null }, // Partner assigned
+  assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Partner", default: null },
   },
   { timestamps: true }
 );
