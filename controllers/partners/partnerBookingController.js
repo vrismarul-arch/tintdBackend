@@ -21,15 +21,15 @@ export const getAvailableBookings = async (req, res) => {
 // =============================
 export const pickBooking = async (req, res) => {
   try {
-    const { id } = req.params; // booking ID
+    const bookingId = req.params.id;
     const partnerId = req.partner._id;
 
-    const booking = await Booking.findById(id);
+    const booking = await Booking.findById(bookingId);
     if (!booking) return res.status(404).json({ error: "Booking not found" });
-    if (booking.assignedTo) return res.status(400).json({ error: "Already picked by another partner" });
+    if (booking.assignedTo.toString() !== partnerId.toString())
+      return res.status(403).json({ error: "Not assigned to you" });
 
-    booking.assignedTo = partnerId;
-    booking.status = "picked";
+    booking.status = "picked"; // mark as accepted by partner
     await booking.save();
 
     res.json({ message: "Booking picked successfully", booking });

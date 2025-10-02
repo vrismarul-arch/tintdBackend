@@ -107,3 +107,32 @@ export const getBookingById = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+export const assignPartnerToBooking = async (req, res) => {
+  try {
+    const { partnerId } = req.body;
+    const bookingId = req.params.id;
+
+    if (!partnerId) return res.status(400).json({ error: "partnerId is required" });
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+    const partner = await Partner.findById(partnerId);
+    if (!partner) return res.status(404).json({ error: "Partner not found" });
+
+    // ✅ Only assign the partner, do NOT change the booking status
+    booking.assignedTo = partnerId;
+
+    await booking.save();
+
+    const updatedBooking = await Booking.findById(bookingId)
+      .populate("services.serviceId", "name price imageUrl")
+      .populate("user", "name email phone")
+      .populate("assignedTo", "name email phone");
+
+    res.json({ message: "Partner assigned successfully", booking: updatedBooking });
+  } catch (err) {
+    console.error("Assign partner error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};

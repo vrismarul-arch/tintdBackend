@@ -1,22 +1,25 @@
 // controllers/partners/notificationController.js
-import Booking from "../../models/Booking.js"; // ✅ import Booking model
-import Partner from "../../models/partners/Partner.js"; // optional if you want partner info
+import Booking from "../../models/Booking.js";
 
 // Fetch notifications for logged-in partner
 export const getPartnerNotifications = async (req, res) => {
   try {
     const partnerId = req.partner._id;
 
-    // Fetch all pending bookings (not assigned to any partner)
-    const bookings = await Booking.find({ status: "pending", assignedTo: null })
-      .populate("services.serviceId", "name price imageUrl"); // populate service info
+    // Only bookings assigned to this partner and still pending acceptance
+    const bookings = await Booking.find({ 
+      assignedTo: partnerId,
+      status: "confirmed" // only newly assigned, not yet accepted/picked
+    })
+      .populate("services.serviceId", "name price imageUrl")
+      .populate("user", "name email phone");
 
-    // Convert bookings to notifications with full details
     const notifications = bookings.map((b) => ({
       id: b._id,
       bookingId: b._id,
-      booking: b, // send the full booking object
-      text: `New booking ${b.bookingId || b._id} is available`,
+      booking: b,
+      text: `Booking ${b.bookingId || b._id} has been assigned to you`,
+      status: b.status,
       createdAt: b.createdAt,
     }));
 

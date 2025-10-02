@@ -110,33 +110,48 @@ export const getPartnerProfile = async (req, res) => {
 // =============================
 // 📌 Update Partner
 // =============================
+// controllers/partners/partnerController.js
+// controllers/partners/partnerController.js
 export const updatePartner = async (req, res) => {
   try {
     const partner = await Partner.findById(req.partner._id);
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
-    let updates = { ...req.body };
+    const protectedFields = ["partnerId", "status", "_id", "createdAt"];
 
-    // ❌ Prevent editing system fields
-    delete updates.partnerId;
-    delete updates.status;
+    // -----------------------
+    // Update text fields from body
+    // -----------------------
+    Object.keys(req.body).forEach((key) => {
+      if (!protectedFields.includes(key)) {
+        // Handle DOB properly
+        if (key === "dob" && req.body.dob) {
+          partner.dob = new Date(req.body.dob);
+        } else {
+          partner[key] = req.body[key];
+        }
+      }
+    });
 
-    // 📂 Handle file uploads
+    // -----------------------
+    // Update uploaded files
+    // -----------------------
     if (req.files) {
       for (const key in req.files) {
-        updates[key] = await uploadToSupabase(req.files[key][0]);
+        if (req.files[key][0]) {
+          partner[key] = await uploadToSupabase(req.files[key][0]);
+        }
       }
     }
 
-    // ✅ Handle dutyStatus separately if present
-    if (updates.hasOwnProperty("dutyStatus")) {
-      partner.dutyStatus = updates.dutyStatus;
-      delete updates.dutyStatus;
-    }
-
-    Object.assign(partner, updates);
+    // -----------------------
+    // Save partner
+    // -----------------------
     await partner.save();
 
+    // -----------------------
+    // Return updated partner object (all fields properly formatted)
+    // -----------------------
     res.json({
       _id: partner._id,
       partnerId: partner.partnerId,
@@ -150,7 +165,7 @@ export const updatePartner = async (req, res) => {
       status: partner.status,
       dutyStatus: partner.dutyStatus,
       avatar: partner.avatar || null,
-      dob: partner.dob,
+      dob: partner.dob ? partner.dob.toISOString().split("T")[0] : null,
       bankName: partner.bankName,
       accountNumber: partner.accountNumber,
       ifsc: partner.ifsc,
@@ -167,6 +182,8 @@ export const updatePartner = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
+
 
 // =============================
 // 📌 Toggle Duty ON/OFF

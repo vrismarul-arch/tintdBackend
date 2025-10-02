@@ -78,35 +78,79 @@ export const getPartnerProfile = async (req, res) => {
 // =============================
 // UPDATE PARTNER (PROFILE / DOCS / DUTY)
 // =============================
+
 export const updatePartner = async (req, res) => {
   try {
     const partner = await Partner.findById(req.partner._id);
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
-    let updates = { ...req.body };
-    delete updates.partnerId;
-    delete updates.status;
+    const protectedFields = ["partnerId", "status", "_id", "createdAt"];
 
+    // -----------------------
+    // Update text fields from body
+    // -----------------------
+    Object.keys(req.body).forEach((key) => {
+      if (!protectedFields.includes(key)) {
+        // Handle DOB properly
+        if (key === "dob" && req.body.dob) {
+          partner.dob = new Date(req.body.dob);
+        } else {
+          partner[key] = req.body[key];
+        }
+      }
+    });
+
+    // -----------------------
+    // Update uploaded files
+    // -----------------------
     if (req.files) {
       for (const key in req.files) {
-        updates[key] = await uploadToSupabase(req.files[key][0]);
+        if (req.files[key][0]) {
+          partner[key] = await uploadToSupabase(req.files[key][0]);
+        }
       }
     }
 
-    if (updates.hasOwnProperty("dutyStatus")) {
-      partner.dutyStatus = updates.dutyStatus;
-      delete updates.dutyStatus;
-    }
-
-    Object.assign(partner, updates);
+    // -----------------------
+    // Save partner
+    // -----------------------
     await partner.save();
 
-    res.json(partner);
+    // -----------------------
+    // Return updated partner object (all fields properly formatted)
+    // -----------------------
+    res.json({
+      _id: partner._id,
+      partnerId: partner.partnerId,
+      name: partner.name,
+      email: partner.email,
+      phone: partner.phone,
+      city: partner.city,
+      gender: partner.gender,
+      profession: partner.profession,
+      experience: partner.experience,
+      status: partner.status,
+      dutyStatus: partner.dutyStatus,
+      avatar: partner.avatar || null,
+      dob: partner.dob ? partner.dob.toISOString().split("T")[0] : null,
+      bankName: partner.bankName,
+      accountNumber: partner.accountNumber,
+      ifsc: partner.ifsc,
+      aadhaarFront: partner.aadhaarFront,
+      aadhaarBack: partner.aadhaarBack,
+      pan: partner.pan,
+      professionalCert: partner.professionalCert,
+      stepStatus: partner.stepStatus || {},
+      createdAt: partner.createdAt,
+      updatedAt: partner.updatedAt,
+    });
   } catch (error) {
-    console.error(error);
+    console.error("Update error:", error);
     res.status(500).json({ error: "Server error" });
   }
 };
+
+
 
 // =============================
 // TOGGLE DUTY

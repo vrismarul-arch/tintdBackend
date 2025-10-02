@@ -269,15 +269,11 @@ export const assignPartnerToBooking = async (req, res) => {
     const booking = await Booking.findById(bookingId);
     if (!booking) return res.status(404).json({ error: "Booking not found" });
 
-    // Make sure partner exists
     const partner = await Partner.findById(partnerId);
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
+    // ✅ Only assign the partner, do NOT change the booking status
     booking.assignedTo = partnerId;
-
-    if (!booking.status || booking.status === "pending") {
-      booking.status = "confirmed";
-    }
 
     await booking.save();
 
