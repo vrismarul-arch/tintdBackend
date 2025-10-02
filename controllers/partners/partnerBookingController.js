@@ -2,6 +2,21 @@ import Booking from "../../models/Booking.js";
 import Partner from "../../models/partners/Partner.js";
 
 // =============================
+// Get available bookings (not assigned yet)
+// =============================
+export const getAvailableBookings = async (req, res) => {
+  try {
+    const bookings = await Booking.find({ status: "pending", assignedTo: null })
+      .populate("services.serviceId", "name price imageUrl")
+      .populate("user", "name email phone");
+    res.json(bookings);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch available bookings" });
+  }
+};
+
+// =============================
 // Partner picks a booking
 // =============================
 export const pickBooking = async (req, res) => {
@@ -82,14 +97,17 @@ export const rejectBooking = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+
+// =============================
+// Partner order history
+// =============================
 export const getPartnerOrderHistory = async (req, res) => {
   try {
     const partnerId = req.partner._id; // assuming partner auth middleware sets req.partner
 
-    // Fetch bookings assigned to this partner
     const bookings = await Booking.find({ assignedTo: partnerId })
-      .populate("user", "name email phone")       // populate user info
-      .populate("services.serviceId", "name price"); // populate services
+      .populate("user", "name email phone")
+      .populate("services.serviceId", "name price imageUrl");
 
     res.json(bookings);
   } catch (err) {

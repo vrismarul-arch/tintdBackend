@@ -259,3 +259,36 @@ export const getPartnerNotifications = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+export const assignPartnerToBooking = async (req, res) => {
+  try {
+    const { partnerId } = req.body;
+    const bookingId = req.params.id;
+
+    if (!partnerId) return res.status(400).json({ error: "partnerId is required" });
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+    // Make sure partner exists
+    const partner = await Partner.findById(partnerId);
+    if (!partner) return res.status(404).json({ error: "Partner not found" });
+
+    booking.assignedTo = partnerId;
+
+    if (!booking.status || booking.status === "pending") {
+      booking.status = "confirmed";
+    }
+
+    await booking.save();
+
+    const updatedBooking = await Booking.findById(bookingId)
+      .populate("services.serviceId", "name price imageUrl")
+      .populate("user", "name email phone")
+      .populate("assignedTo", "name email phone");
+
+    res.json({ message: "Partner assigned successfully", booking: updatedBooking });
+  } catch (err) {
+    console.error("Assign partner error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};

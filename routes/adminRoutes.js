@@ -1,6 +1,6 @@
 import express from "express";
 
-// Controllers for categories, subcategories, varieties, services
+// ----------------- Controllers -----------------
 import {
   createCategory,
   getCategories,
@@ -35,18 +35,18 @@ import {
   upload as varietyUpload,
 } from "../controllers/varietyController.js";
 
-// Controllers for bookings + profile
 import {
   getAllBookings,
   updateBooking,
   getBookingById,
   getAdminProfile,
+  assignPartnerToBooking, // ✅ new controller for assign
 } from "../controllers/adminController.js";
 
-// Partner routes
+// ----------------- Partner routes -----------------
 import partnerRoutes from "./partners/partnerRoutes.js";
 
-// Middleware
+// ----------------- Middleware -----------------
 import { protect, admin } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -58,17 +58,9 @@ router.put("/categories/:id", categoryUpload.single("image"), updateCategory);
 router.delete("/categories/:id", deleteCategory);
 
 /* ----------------- SubCategories ----------------- */
-router.post(
-  "/subcategories",
-  subCategoryUpload.single("image"),
-  createSubCategory
-);
+router.post("/subcategories", subCategoryUpload.single("image"), createSubCategory);
 router.get("/subcategories", getSubCategories);
-router.put(
-  "/subcategories/:id",
-  subCategoryUpload.single("image"),
-  updateSubCategory
-);
+router.put("/subcategories/:id", subCategoryUpload.single("image"), updateSubCategory);
 router.delete("/subcategories/:id", deleteSubCategory);
 
 /* ----------------- Varieties ----------------- */
@@ -89,6 +81,9 @@ router.delete("/services/:id", deleteService);
 router.get("/bookings", getAllBookings);
 router.put("/bookings/:id", updateBooking);
 router.get("/bookings/:id", getBookingById);
+
+// ----------------- Assign partner to booking -----------------
+router.put("/bookings/:id/assign", assignPartnerToBooking);
 
 /* ----------------- Admin Profile ----------------- */
 router.get("/profile", protect, admin, getAdminProfile);

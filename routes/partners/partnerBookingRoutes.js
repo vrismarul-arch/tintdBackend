@@ -22,3 +22,4 @@ router.put("/:id/complete", partnerProtect, completeBooking);
 router.put("/:id/reject", partnerProtect, rejectBooking);
 router.get("/history", partnerProtect, getPartnerOrderHistory);
 export default router;
+ 
