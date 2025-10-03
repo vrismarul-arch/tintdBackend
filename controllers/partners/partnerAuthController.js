@@ -15,7 +15,7 @@ export const upload = multer({ storage });
 const uploadToSupabase = async (file) => {
   const fileName = `${Date.now()}-${file.originalname}`;
   const { error } = await supabase.storage
-    .from("tintd")
+    .from("tintd") // 👈 bucket name
     .upload(fileName, file.buffer, {
       contentType: file.mimetype,
       upsert: true,
@@ -57,8 +57,7 @@ export const loginPartner = async (req, res) => {
       email: partner.email,
       phone: partner.phone,
       status: partner.status,
-      dutyStatus: partner.dutyStatus,
-      avatar: partner.avatar || null,
+      avatar: partner.avatar || null, // ✅ fixed avatar field
       role: "partner",
       token: generateToken(partner._id),
     });
@@ -67,6 +66,7 @@ export const loginPartner = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
+
 // =============================
 // 📌 Get Partner Profile
 // =============================
@@ -161,26 +161,6 @@ export const updatePartner = async (req, res) => {
     });
   } catch (error) {
     console.error("Update error:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-};
-
-
-
-// =============================
-// 📌 Toggle Duty ON/OFF
-// =============================
-export const toggleDuty = async (req, res) => {
-  try {
-    const partner = await Partner.findById(req.partner._id);
-    if (!partner) return res.status(404).json({ error: "Partner not found" });
-
-    partner.dutyStatus = !partner.dutyStatus;
-    await partner.save();
-
-    res.json({ dutyStatus: partner.dutyStatus });
-  } catch (error) {
-    console.error("Duty toggle error:", error);
     res.status(500).json({ error: "Server error" });
   }
 };
