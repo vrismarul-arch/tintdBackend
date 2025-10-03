@@ -67,7 +67,6 @@ export const loginPartner = async (req, res) => {
     res.status(500).json({ error: "Server error" });
   }
 };
-
 // =============================
 // 📌 Get Partner Profile
 // =============================
@@ -77,7 +76,7 @@ export const getPartnerProfile = async (req, res) => {
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
     res.json({
-      _id: partner._id,
+     _id: partner._id,
       partnerId: partner.partnerId,
       name: partner.name,
       email: partner.email,
@@ -87,7 +86,6 @@ export const getPartnerProfile = async (req, res) => {
       profession: partner.profession,
       experience: partner.experience,
       status: partner.status,
-      dutyStatus: partner.dutyStatus,
       avatar: partner.avatar || null,
       dob: partner.dob,
       bankName: partner.bankName,
@@ -99,7 +97,7 @@ export const getPartnerProfile = async (req, res) => {
       professionalCert: partner.professionalCert,
       stepStatus: partner.stepStatus || {},
       createdAt: partner.createdAt,
-      updatedAt: partner.updatedAt,
+      updatedAt: partner.updatedAt, // ✅ consistent return
     });
   } catch (error) {
     console.error("Profile error:", error);
@@ -110,50 +108,35 @@ export const getPartnerProfile = async (req, res) => {
 // =============================
 // 📌 Update Partner
 // =============================
-// controllers/partners/partnerController.js
-// controllers/partners/partnerController.js
 export const updatePartner = async (req, res) => {
   try {
     const partner = await Partner.findById(req.partner._id);
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
-    const protectedFields = ["partnerId", "status", "_id", "createdAt"];
+    let updates = { ...req.body };
 
-    // -----------------------
-    // Update text fields from body
-    // -----------------------
-    Object.keys(req.body).forEach((key) => {
-      if (!protectedFields.includes(key)) {
-        // Handle DOB properly
-        if (key === "dob" && req.body.dob) {
-          partner.dob = new Date(req.body.dob);
-        } else {
-          partner[key] = req.body[key];
-        }
-      }
-    });
+    // ❌ Prevent editing system fields
+    delete updates.partnerId;
+    delete updates.status;
 
-    // -----------------------
-    // Update uploaded files
-    // -----------------------
+    // 📂 Handle file uploads
     if (req.files) {
       for (const key in req.files) {
-        if (req.files[key][0]) {
-          partner[key] = await uploadToSupabase(req.files[key][0]);
-        }
+        updates[key] = await uploadToSupabase(req.files[key][0]);
       }
     }
 
-    // -----------------------
-    // Save partner
-    // -----------------------
+    Object.assign(partner, updates);
     await partner.save();
 
-    // -----------------------
-    // Return updated partner object (all fields properly formatted)
-    // -----------------------
     res.json({
       _id: partner._id,
+      partnerId: partner.partnerId,
+      name: partner.name,
+      email: partner.email,
+      phone: partner.phone,
+      status: partner.status,
+      avatar: partner.avatar || null, _id: partner._id,
       partnerId: partner.partnerId,
       name: partner.name,
       email: partner.email,
@@ -163,9 +146,8 @@ export const updatePartner = async (req, res) => {
       profession: partner.profession,
       experience: partner.experience,
       status: partner.status,
-      dutyStatus: partner.dutyStatus,
       avatar: partner.avatar || null,
-      dob: partner.dob ? partner.dob.toISOString().split("T")[0] : null,
+      dob: partner.dob,
       bankName: partner.bankName,
       accountNumber: partner.accountNumber,
       ifsc: partner.ifsc,
@@ -175,7 +157,7 @@ export const updatePartner = async (req, res) => {
       professionalCert: partner.professionalCert,
       stepStatus: partner.stepStatus || {},
       createdAt: partner.createdAt,
-      updatedAt: partner.updatedAt,
+      updatedAt: partner.updatedAt,// ✅ always return avatar
     });
   } catch (error) {
     console.error("Update error:", error);

@@ -63,7 +63,7 @@ app.use(express.urlencoded({ extended: true }));
 // =============================
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
-app.use("/api/", cartRoutes);
+app.use("/api/cart", cartRoutes);
 app.use("/api/bookings", bookingRoutes);
 /* dsfd */
 // Admin routes
@@ -79,6 +79,8 @@ app.use("/api/services", serviceRoutes);
 
 // Partner routes
 app.use("/api/partners", partnerRoutes);
+app.use("/api/partners", partnerOnboardingRoutes);
+app.use("/api/admin/partners", adminPartnerRoutes);
 app.use("/api/partners/onboarding", partnerOnboardingRoutes);
 app.use("/api/partners/bookings", partnerBookingRoutes);
 app.use("/api/partners/notifications", partnerNotificationRoutes);

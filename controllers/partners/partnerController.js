@@ -75,109 +75,13 @@ export const getPartnerProfile = async (req, res) => {
   }
 };
 
-// =============================
-// UPDATE PARTNER (PROFILE / DOCS / DUTY)
-// =============================
-
-export const updatePartner = async (req, res) => {
-  try {
-    const partner = await Partner.findById(req.partner._id);
-    if (!partner) return res.status(404).json({ error: "Partner not found" });
-
-    const protectedFields = ["partnerId", "status", "_id", "createdAt"];
-
-    // -----------------------
-    // Update text fields from body
-    // -----------------------
-    Object.keys(req.body).forEach((key) => {
-      if (!protectedFields.includes(key)) {
-        // Handle DOB properly
-        if (key === "dob" && req.body.dob) {
-          partner.dob = new Date(req.body.dob);
-        } else {
-          partner[key] = req.body[key];
-        }
-      }
-    });
-
-    // -----------------------
-    // Update uploaded files
-    // -----------------------
-    if (req.files) {
-      for (const key in req.files) {
-        if (req.files[key][0]) {
-          partner[key] = await uploadToSupabase(req.files[key][0]);
-        }
-      }
-    }
-
-    // -----------------------
-    // Save partner
-    // -----------------------
-    await partner.save();
-
-    // -----------------------
-    // Return updated partner object (all fields properly formatted)
-    // -----------------------
-    res.json({
-      _id: partner._id,
-      partnerId: partner.partnerId,
-      name: partner.name,
-      email: partner.email,
-      phone: partner.phone,
-      city: partner.city,
-      gender: partner.gender,
-      profession: partner.profession,
-      experience: partner.experience,
-      status: partner.status,
-      dutyStatus: partner.dutyStatus,
-      avatar: partner.avatar || null,
-      dob: partner.dob ? partner.dob.toISOString().split("T")[0] : null,
-      bankName: partner.bankName,
-      accountNumber: partner.accountNumber,
-      ifsc: partner.ifsc,
-      aadhaarFront: partner.aadhaarFront,
-      aadhaarBack: partner.aadhaarBack,
-      pan: partner.pan,
-      professionalCert: partner.professionalCert,
-      stepStatus: partner.stepStatus || {},
-      createdAt: partner.createdAt,
-      updatedAt: partner.updatedAt,
-    });
-  } catch (error) {
-    console.error("Update error:", error);
-    res.status(500).json({ error: "Server error" });
-  }
-};
-
-
-
-// =============================
-// TOGGLE DUTY
-// =============================
-export const toggleDuty = async (req, res) => {
-  try {
-    const partner = await Partner.findById(req.partner._id);
-    if (!partner) return res.status(404).json({ error: "Partner not found" });
-
-    partner.dutyStatus = !partner.dutyStatus;
-    await partner.save();
-
-    res.json({ dutyStatus: partner.dutyStatus });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Server error" });
-  }
-};
-
-// =============================
-// STEPWISE ONBOARDING
-// =============================
+// Submit step data
 export const submitStep = async (req, res) => {
   try {
     const { step, partnerId } = req.body;
     let data = { ...req.body };
 
+    // Handle uploaded files
     if (req.files) {
       for (const key in req.files) {
         data[key] = await uploadToSupabase(req.files[key][0]);
@@ -207,15 +111,51 @@ export const submitStep = async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 };
-
-// =============================
-// GET ALL PARTNERS (ADMIN)
-// =============================
-export const getPartners = async (_req, res) => {
+export const getPartners = async (req, res) => {
   try {
     const partners = await Partner.find().sort({ createdAt: -1 });
     res.json(partners);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+export const updatePartner = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner._id);
+    if (!partner) return res.status(404).json({ error: "Partner not found" });
+
+    let updates = { ...req.body };
+
+    // Handle file uploads
+    if (req.files) {
+      for (const key in req.files) {
+        updates[key] = await uploadToSupabase(req.files[key][0]);
+      }
+    }
+
+    Object.assign(partner, updates);
+    await partner.save();
+
+    res.json(partner);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+// =============================
+// TOGGLE DUTY
+// =============================
+export const toggleDuty = async (req, res) => {
+  try {
+    const partner = await Partner.findById(req.partner._id);
+    if (!partner) return res.status(404).json({ error: "Partner not found" });
+
+    partner.dutyStatus = !partner.dutyStatus;
+    await partner.save();
+
+    res.json({ dutyStatus: partner.dutyStatus });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
   }
 };
