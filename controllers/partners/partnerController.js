@@ -1,7 +1,7 @@
 import Partner from "../../models/partners/Partner.js";
 import supabase from "../../config/supabase.js";
 import multer from "multer";
-
+import Booking from "../../models/Booking.js";
 const storage = multer.memoryStorage();
 export const upload = multer({ storage });
 
@@ -78,5 +78,25 @@ export const updatePartner = async (req, res) => {
     res.json(partner);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+};
+/* ==============================
+   Get Single Partner + Orders
+============================== */
+export const getPartnerById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const partner = await Partner.findById(id);
+    if (!partner) return res.status(404).json({ error: "Partner not found" });
+
+    const orders = await Booking.find({ assignedTo: id })
+      .populate("user", "name email phone")
+      .populate("services.serviceId", "name price imageUrl");
+
+    // Make sure _id is included
+    res.json({ partner: { ...partner.toObject(), id: partner._id }, orders });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch partner details" });
   }
 };
