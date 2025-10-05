@@ -5,26 +5,17 @@ import {
   getCart, 
   updateQuantity, 
   removeFromCart, 
-  clearCart  // ✅ Import clearCart controller
+  clearCart  
 } from "../controllers/cartController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-// Add item to cart
-router.post("/cart/add", protect, addToCart);
-
-// Get user cart
-router.get("/cart", protect, getCart);
-
-// Update quantity
-router.put("/cart/:serviceId", protect, updateQuantity);
-
-// Remove item
-router.delete("/cart/:serviceId", protect, removeFromCart);
-
-// ✅ Clear entire cart
-router.delete("/cart", protect, clearCart);
-
+// ✅ Corrected paths (no extra /cart prefix)
+router.post("/add", protect, addToCart);
+router.get("/", protect, getCart);
+router.put("/:serviceId", protect, updateQuantity);
+router.delete("/:serviceId", protect, removeFromCart);
+router.delete("/", protect, clearCart);
 
 export default router;
