@@ -1,6 +1,6 @@
 import Booking from "../models/Booking.js";
 import Partner from "../models/partners/Partner.js"; // ✅ Import Partner
-
+/*  */
 // Get all bookings (admin)
 export const getAllBookings = async (req, res) => {
   try {
