@@ -8,92 +8,128 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
-// ✅ Create Razorpay order + temp booking
+// =============================
+// Create Razorpay order
+// =============================
 export const createOrder = async (req, res) => {
   try {
-    const {
-      name, email, phone, address, services, totalAmount,
-      userId, paymentMethod, selectedDate, selectedTime
-    } = req.body;
+    const { totalAmount } = req.body;
 
-    // Save temporary booking
-    const tempBooking = new Booking({
-      name,
-      email,
-      phone,
-      address,
-      services,
-      totalAmount,
-      paymentMethod,    // ✅ added
-      selectedDate,     // ✅ added
-      selectedTime,     // ✅ added
-      status: "pending",
-      user: userId
-    });
-    await tempBooking.save();
+    if (!totalAmount) {
+      return res.status(400).json({ error: "Total amount is required" });
+    }
 
-    // Create Razorpay order
     const options = {
-      amount: Math.round(totalAmount * 100),
+      amount: Math.round(totalAmount * 100), // Razorpay uses paise
       currency: "INR",
       receipt: "receipt_" + Date.now(),
     };
+
     const order = await razorpay.orders.create(options);
 
-    // Save payment
     await Payment.create({
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      booking: tempBooking._id,
       status: "created",
     });
 
-    res.json({ orderId: order.id, amount: order.amount, currency: order.currency, bookingId: tempBooking._id });
+    res.json({
+      orderId: order.id,
+      amount: order.amount,
+      currency: order.currency,
+    });
   } catch (err) {
     console.error("Create order error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Verify Razorpay payment
+// =============================
+// Verify Razorpay payment + Create Booking
+// =============================
 export const verifyPayment = async (req, res) => {
   try {
-    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, bookingId } = req.body;
-    const expectedSign = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`).digest("hex");
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      bookingData, // entire booking details passed from frontend
+    } = req.body;
 
-    if (razorpay_signature === expectedSign) {
-      const payment = await Payment.findOneAndUpdate(
+    if (!bookingData) {
+      return res.status(400).json({ error: "Booking data missing" });
+    }
+
+    const expectedSign = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+      .digest("hex");
+
+    if (razorpay_signature !== expectedSign) {
+      await Payment.findOneAndUpdate(
         { orderId: razorpay_order_id },
-        { paymentId: razorpay_payment_id, signature: razorpay_signature, status: "paid" },
-        { new: true }
+        { status: "failed" }
       );
-
-      const booking = await Booking.findByIdAndUpdate(
-        bookingId,
-        { status: "confirmed", paymentMethod: "razorpay" },
-        { new: true }
-      );
-
-      payment.booking = booking._id;
-      await payment.save();
-
-      return res.json({ success: true, booking });
-    } else {
-      await Payment.findOneAndUpdate({ orderId: razorpay_order_id }, { status: "failed" });
       return res.status(400).json({ success: false, message: "Invalid signature" });
     }
+
+    // ✅ Mark payment as paid
+    const payment = await Payment.findOneAndUpdate(
+      { orderId: razorpay_order_id },
+      {
+        paymentId: razorpay_payment_id,
+        signature: razorpay_signature,
+        status: "paid",
+      },
+      { new: true }
+    );
+
+    // ✅ Create confirmed booking
+    const booking = new Booking({
+      name: bookingData.name,
+      email: bookingData.email,
+      phone: bookingData.phone,
+      address: bookingData.address,
+      services: bookingData.services,
+      totalAmount: bookingData.totalAmount,
+      paymentMethod: "razorpay",
+      selectedDate: bookingData.selectedDate,
+      selectedTime: bookingData.selectedTime,
+      status: "confirmed",
+      user: bookingData.userId || null,
+    });
+
+    await booking.save();
+
+    // Link booking to payment
+    payment.booking = booking._id;
+    await payment.save();
+
+    return res.json({ success: true, booking });
   } catch (err) {
     console.error("Verify payment error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// ✅ Cash on Delivery
+// =============================
+// Cash on Delivery Booking
+// =============================
 export const createCODBooking = async (req, res) => {
   try {
-    const { name, email, phone, address, services, totalAmount, userId, selectedDate, selectedTime } = req.body;
+    const {
+      name,
+      email,
+      phone,
+      address,
+      services,
+      totalAmount,
+      userId,
+      selectedDate,
+      selectedTime,
+    } = req.body;
+
     const booking = new Booking({
       name,
       email,
@@ -105,8 +141,9 @@ export const createCODBooking = async (req, res) => {
       selectedDate,
       selectedTime,
       status: "confirmed",
-      user: userId
+      user: userId || null,
     });
+
     await booking.save();
     res.json({ success: true, booking });
   } catch (err) {
