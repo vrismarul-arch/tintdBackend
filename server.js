@@ -41,7 +41,7 @@ const app = express();
 // =============================
 // 🌐 CORS Configuration
 // =============================
-const allowedOrigins = ["http://localhost:5173", "https://tintd.netlify.app"];
+const allowedOrigins = ["http://localhost:5173", "https://tintd.netlify.app","https://tintd.in"];
 app.use(
   cors({
     origin: (origin, callback) => {
