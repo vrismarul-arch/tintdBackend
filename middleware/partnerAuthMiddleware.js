@@ -1,35 +1,38 @@
 import jwt from "jsonwebtoken";
 import Partner from "../models/partners/Partner.js";
 
-/**
- * Middleware to protect routes for partners.
- * Verifies JWT token and attaches the partner to `req.partner`.
- */
 export const partnerProtect = async (req, res, next) => {
   let token;
 
-  // Check for Bearer token in Authorization header
   if (req.headers.authorization?.startsWith("Bearer")) {
-    try {
-      // Extract token
-      token = req.headers.authorization.split(" ")[1];
+    token = req.headers.authorization.split(" ")[1];
 
-      // Verify token
+    try {
+      // VERIFY JWT
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      // Fetch partner from DB
+      // FETCH USER
       const partner = await Partner.findById(decoded.id).select("-password");
       if (!partner) {
         return res.status(404).json({ error: "Partner not found" });
       }
 
-      req.partner = partner; // attach partner to request
+      req.partner = partner;
       next();
+
     } catch (error) {
       console.error("Auth error:", error);
-      return res.status(401).json({ error: "Not authorized, token failed" });
+
+      // EXPIRED TOKEN
+      if (error.name === "TokenExpiredError") {
+        return res.status(401).json({ error: "Token expired" });
+      }
+
+      // INVALID TOKEN
+      return res.status(401).json({ error: "Invalid token" });
     }
+
   } else {
-    return res.status(401).json({ error: "Not authorized, no token" });
+    return res.status(401).json({ error: "No token provided" });
   }
 };

@@ -4,83 +4,82 @@ const serviceSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
     description: String,
-    originalPrice: { type: Number, required: true },
-    price: { type: Number, required: true },   // Final price after discount
-    discount: { type: Number, default: 0 },    // Discount %
-    duration: { type: Number, required: true }, // in minutes
 
-    // Relations
+    originalPrice: { type: Number, required: true },
+    price: { type: Number, required: true },
+    discount: { type: Number, default: 0 },
+
+    duration: { type: Number, required: true },
+
+    // ⭐ STATUS
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active"
+    },
+
+    // relations
     category: { type: mongoose.Schema.Types.ObjectId, ref: "Category", required: true },
     subCategory: { type: mongoose.Schema.Types.ObjectId, ref: "SubCategory", required: true },
     variety: { type: mongoose.Schema.Types.ObjectId, ref: "Variety", required: true },
 
-    // ✅ Reference to ServiceDetail
     details: { type: mongoose.Schema.Types.ObjectId, ref: "ServiceDetail" },
 
     imageUrl: String,
 
-    // ✅ Step 1: Overview Section
     overview: [
       {
-        img: { type: String, trim: true }, // store image URL
-        title: { type: String, required: true, trim: true },
-      },
+        img: { type: String, trim: true },
+        title: { type: String, required: true }
+      }
     ],
 
-    // ✅ Step 2: Procedure Steps Section
     procedureSteps: [
       {
-        img: { type: String, trim: true }, // store image URL
-        title: { type: String, required: true, trim: true },
-        desc: { type: String, required: true, trim: true },
-      },
+        img: { type: String, trim: true },
+        title: { type: String, required: true },
+        desc: { type: String, required: true }
+      }
     ],
 
-    // ✅ Step 3: Things to Know Section
     thingsToKnow: [
       {
-        title: { type: String, required: true, trim: true },
-        desc: { type: String, required: true, trim: true },
-      },
+        title: { type: String, required: true },
+        desc: { type: String, required: true }
+      }
     ],
 
-    // ✅ Step 4: Precautions / Aftercare Section
     precautionsAftercare: [
       {
-        title: { type: String, required: true, trim: true },
-        desc: { type: String, required: true, trim: true },
-      },
+        title: { type: String, required: true },
+        desc: { type: String, required: true }
+      }
     ],
 
-    // ✅ Step 5: FAQs Section
     faqs: [
       {
-        question: { type: String, required: true, trim: true },
-        answer: { type: String, required: true, trim: true },
-      },
-    ],
+        question: { type: String, required: true },
+        answer: { type: String, required: true }
+      }
+    ]
   },
   { timestamps: true }
 );
 
-// Virtual field for auto-calculating % discount
+// virtual discount calculation
 serviceSchema.virtual("calculatedDiscount").get(function () {
   if (!this.originalPrice || !this.price) return 0;
   return Math.round(((this.originalPrice - this.price) / this.originalPrice) * 100);
 });
 
-// ✅ Pre-save hook: auto-calculate price or discount
+// auto adjust discount/price
 serviceSchema.pre("save", function (next) {
-  // If discount is set, recalc price
   if (this.isModified("discount") && this.discount > 0) {
     this.price = this.originalPrice - (this.originalPrice * this.discount) / 100;
   }
-
-  // If price is set manually, recalc discount
   if (this.isModified("price")) {
     this.discount = Math.round(((this.originalPrice - this.price) / this.originalPrice) * 100);
   }
-
   next();
 });
 
