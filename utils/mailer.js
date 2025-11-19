@@ -4,12 +4,12 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 465,
-  secure: true, // Gmail requires SSL on port 465
+  host: "smtp.zoho.in",     // 🇮🇳 India Zoho Server (best for your domain vrism.in)
+  port: 465,                // SSL Port
+  secure: true,             // SSL must be true on 465
   auth: {
-    user: process.env.MAIL_USER, // your full Gmail address
-    pass: process.env.MAIL_PASS, // your 16-digit App Password
+    user: process.env.MAIL_USER,  // your Zoho email (full email)
+    pass: process.env.MAIL_PASS,  // your Zoho App Password
   },
 });
 
