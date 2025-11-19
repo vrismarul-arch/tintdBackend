@@ -25,13 +25,14 @@ export const approvePartner = async (req, res) => {
     if (!partner) return res.status(404).json({ error: "Partner not found" });
 
     // Generate incremental Partner ID
+    // ⚠️ This relies on the Counter model being correctly defined and persistent.
     const counter = await Counter.findOneAndUpdate(
       { name: "partnerId" },
       { $inc: { seq: 1 } },
-      { new: true, upsert: true }
+      { new: true, upsert: true } // Upsert ensures the counter document is created if it doesn't exist.
     );
 
-    const partnerId = `tdpartner-${String(counter.seq).padStart(3, "0")}`;
+    const partnerId = `tintdpartner-${String(counter.seq).padStart(3, "0")}`;
     const defaultPassword = "tintd@123456";
 
     // Hash password before saving

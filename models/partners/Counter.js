@@ -1,8 +1,20 @@
-import mongoose from "mongoose";
+// models/partners/Counter.js
+
+import mongoose from 'mongoose';
 
 const counterSchema = new mongoose.Schema({
-  name: { type: String, required: true, unique: true }, // e.g., "partnerId"
-  seq: { type: Number, default: 0 }, // auto-increment value
+    // Name must be 'partnerId' to match the query in the controller
+    name: { 
+        type: String, 
+        required: true, 
+        unique: true 
+    },
+    // The sequence number
+    seq: { 
+        type: Number, 
+        default: 0 
+    }
 });
 
-export default mongoose.model("Counter", counterSchema);
+// Mongoose will store this in a collection, usually named 'counters'
+export default mongoose.model('Counter', counterSchema);

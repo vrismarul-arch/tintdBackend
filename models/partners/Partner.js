@@ -1,4 +1,3 @@
-// models/partners/Partner.js
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
@@ -17,10 +16,10 @@ const partnerSchema = new mongoose.Schema({
   ifsc: String,
   experience: { type: String, default: "fresher" },
   professionalCert: String,
- dob: { type: String }, // ✅ Added Date of Birth
-    avatar: { type: String }, 
+  dob: { type: String }, 
+  avatar: { type: String }, 
   partnerId: { type: String, unique: true },
-  password: { type: String, required: false }, // ✅ store password properly
+  password: { type: String, required: false }, 
   status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
 
   stepStatus: {
@@ -31,7 +30,7 @@ const partnerSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// 🔑 Hash password before save if modified
+// Hash password before save if modified
 partnerSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);
@@ -39,7 +38,7 @@ partnerSchema.pre("save", async function (next) {
   next();
 });
 
-// ✅ Compare passwords
+// Compare passwords method
 partnerSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
