@@ -1,115 +1,131 @@
 import Booking from "../../models/Booking.js";
 import Partner from "../../models/partners/Partner.js";
 
-// =============================
-// Get available bookings (not assigned yet)
-// =============================
+/* =============================
+   Get available bookings
+   (pending + not assigned)
+============================= */
 export const getAvailableBookings = async (req, res) => {
   try {
-    const bookings = await Booking.find({ status: "pending", assignedTo: null })
-      .populate("services.serviceId", "name price imageUrl")
+    const bookings = await Booking.find({
+      status: "pending",
+      assignedTo: null,
+    })
+      .populate("items.service", "name price imageUrl")
+      .populate("items.combo", "title price services")
       .populate("user", "name email phone");
-    res.json(bookings);
+
+    res.json({ success: true, bookings });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch available bookings" });
   }
 };
 
-// =============================
-// Partner picks a booking
-// =============================
+/* =============================
+   Partner picks a booking
+============================= */
 export const pickBooking = async (req, res) => {
   try {
     const bookingId = req.params.id;
     const partnerId = req.partner._id;
 
     const booking = await Booking.findById(bookingId);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
-    if (booking.assignedTo.toString() !== partnerId.toString())
-      return res.status(403).json({ error: "Not assigned to you" });
+    if (!booking)
+      return res.status(404).json({ error: "Booking not found" });
 
-    booking.status = "picked"; // mark as accepted by partner
+    if (booking.assignedTo)
+      return res.status(400).json({ error: "Booking already picked" });
+
+    booking.assignedTo = partnerId;
+    booking.status = "picked";
+
     await booking.save();
 
-    res.json({ message: "Booking picked successfully", booking });
+    res.json({
+      success: true,
+      message: "Booking picked successfully",
+      booking,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// =============================
-// Partner confirms a booking
-// =============================
+/* =============================
+   Partner confirms booking
+============================= */
 export const confirmBooking = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+    if (!booking)
+      return res.status(404).json({ error: "Booking not found" });
+
+    if (
+      booking.assignedTo?.toString() !== req.partner._id.toString()
+    ) {
+      return res.status(403).json({ error: "Not your booking" });
+    }
 
     booking.status = "confirmed";
-    booking.assignedTo = req.partner._id;
     await booking.save();
 
-    res.json({ message: "Booking confirmed", booking });
+    res.json({
+      success: true,
+      message: "Booking confirmed",
+      booking,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// =============================
-// Partner completes a booking
-// =============================
+/* =============================
+   Partner completes booking
+============================= */
 export const completeBooking = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
+
+    if (!booking)
+      return res.status(404).json({ error: "Booking not found" });
 
     if (booking.status !== "confirmed") {
-      return res.status(400).json({ error: "Booking must be confirmed before completing" });
+      return res
+        .status(400)
+        .json({ error: "Booking must be confirmed before completing" });
     }
 
     booking.status = "completed";
     await booking.save();
 
-    res.json({ message: "Booking completed successfully", booking });
+    res.json({
+      success: true,
+      message: "Booking completed successfully",
+      booking,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// =============================
-// Partner rejects a booking
-// =============================
-export const rejectBooking = async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
-
-    booking.status = "rejected";
-    await booking.save();
-
-    res.json({ message: "Booking rejected", booking });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// =============================
-// Partner order history
-// =============================
+/* =============================
+   Partner order history
+============================= */
 export const getPartnerOrderHistory = async (req, res) => {
   try {
-    const partnerId = req.partner._id; // assuming partner auth middleware sets req.partner
+    const partnerId = req.partner._id;
 
     const bookings = await Booking.find({ assignedTo: partnerId })
-      .populate("user", "name email phone")
-      .populate("services.serviceId", "name price imageUrl");
+      .populate("items.service", "name price imageUrl")
+      .populate("items.combo", "title price services")
+      .populate("user", "name email phone");
 
-    res.json(bookings);
+    res.json({ success: true, bookings });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch order history" });

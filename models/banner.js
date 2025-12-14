@@ -2,15 +2,34 @@ import mongoose from "mongoose";
 
 const bannerSchema = new mongoose.Schema(
   {
-    title: { type: String, required: true },              // Main banner heading
-    subtitle: { type: String },                           // Optional sub text
-    btnText: { type: String },                            // Call-to-action button text
-    btnLink: { type: String },                            // URL for button
-    imageUrl: { type: String, required: true },           // Banner image (stored in Supabase/Cloudinary/Firebase)
-    isActive: { type: Boolean, default: true },           // Whether banner is visible
-    schedule: {                                           // Optional schedule
-      startDate: { type: Date },
-      endDate: { type: Date },
+    title: { type: String, required: true },
+    subtitle: String,
+
+    // 🔗 Banner belongs to ONE combo
+    combo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ComboPackage",
+      required: true,
+    },
+
+    btnText: {
+      type: String,
+      default: "Book Now",
+    },
+
+    imageUrl: {
+      type: String,
+      required: true,
+    },
+
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+
+    schedule: {
+      startDate: Date,
+      endDate: Date,
     },
   },
   { timestamps: true }

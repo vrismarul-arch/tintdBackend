@@ -1,290 +1,392 @@
 import Booking from "../models/Booking.js";
 import Service from "../models/Service.js";
+import ComboPackage from "../models/ComboPackage.js";
 import Partner from "../models/partners/Partner.js";
 import Notification from "../models/partners/Notification.js";
 import { sendPushNotification } from "../utils/pushNotification.js";
 
-// =========================
-// Create a new booking
-// =========================
+/* ======================================================
+   GET ADMIN BOOKING BY ID (FULL POPULATE)
+====================================================== */
+export const getAdminBookingById = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id)
+      .populate({
+        path: "items.service",
+        select: "name price imageUrl",
+      })
+      .populate({
+        path: "items.combo",
+        select: "title price originalPrice discount",
+        populate: {
+          path: "services",
+          select: "name price imageUrl",
+        },
+      })
+      .populate("user", "name email phone")
+      .populate("assignedTo", "name email phone");
+
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    res.status(200).json({ success: true, booking });
+  } catch (err) {
+    console.error("Get booking error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+
+/* ======================================================
+   CREATE BOOKING  (CART → BOOKING)
+====================================================== */
 export const createBooking = async (req, res) => {
   try {
-    const { name, email, phone, address, location, services, totalAmount, selectedDate, selectedTime, paymentMethod } = req.body;
+    const {
+      name,
+      email,
+      phone,
+      address,
+      location,
+      items,
+      totalAmount,
+      selectedDate,
+      selectedTime,
+      paymentMethod,
+    } = req.body;
 
-    if (!name || !email || !phone || !address || !services || !selectedDate || !selectedTime || !paymentMethod)
+    if (
+      !name ||
+      !email ||
+      !phone ||
+      !address ||
+      !items ||
+      items.length === 0 ||
+      !selectedDate ||
+      !selectedTime ||
+      !paymentMethod
+    ) {
       return res.status(400).json({ error: "All fields are required" });
+    }
 
-    const serviceIds = services.map(s => s.serviceId);
-    const fetchedServices = await Service.find({ _id: { $in: serviceIds } });
-    if (fetchedServices.length !== services.length)
-      return res.status(400).json({ error: "Some services are invalid" });
+    for (const item of items) {
+      if (item.itemType === "service") {
+        const service = await Service.findById(item.service);
+        if (!service) {
+          return res.status(400).json({ error: "Invalid service item" });
+        }
+      }
+
+      if (item.itemType === "combo") {
+        const combo = await ComboPackage.findById(item.combo);
+        if (!combo) {
+          return res.status(400).json({ error: "Invalid combo item" });
+        }
+      }
+    }
 
     const booking = new Booking({
       user: req.user?._id || null,
-      name, email, phone, address, location,
-      services, totalAmount, selectedDate, selectedTime, paymentMethod,
+      name,
+      email,
+      phone,
+      address,
+      location,
+      items,
+      totalAmount,
+      selectedDate,
+      selectedTime,
+      paymentMethod,
+      orderStatus: "unpaid", // ✅ NEW FIELD
     });
 
     await booking.save();
 
-    // Notify duty-on partners and save notifications
-    const availablePartners = await Partner.find({ dutyStatus: true });
+    const populatedBooking = await Booking.findById(booking._id)
+      .populate("items.service", "name price imageUrl")
+      .populate({
+        path: "items.combo",
+        select: "title price originalPrice discount",
+        populate: {
+          path: "services",
+          select: "name price imageUrl",
+        },
+      })
+      .populate("user", "name email phone");
 
-    for (let partner of availablePartners) {
-      const text = `New booking ${booking.bookingId || booking._id} is available`;
-      
-      // Save notification in DB
-      const notification = new Notification({
+    const partners = await Partner.find({ dutyStatus: true });
+
+    for (const partner of partners) {
+      const text = `New booking ${booking.bookingId} available`;
+
+      await Notification.create({
         partner: partner._id,
         booking: booking._id,
-        text
+        text,
       });
-      await notification.save();
 
-      // Send push notification if available
       if (partner.pushToken) {
         await sendPushNotification(partner.pushToken, {
-          title: "New Order Available",
+          title: "New Booking Available",
           body: text,
           data: { bookingId: booking._id.toString() },
         });
       }
     }
 
-    res.status(201).json({ message: "Booking successful", booking });
+    res.status(201).json({
+      success: true,
+      booking: populatedBooking,
+    });
   } catch (err) {
     console.error("Create booking error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// =========================
-// Get all available bookings for partners (not picked)
-// =========================
-export const getAvailableBookings = async (req, res) => {
-  try {
-    const bookings = await Booking.find({ status: "pending", assignedTo: null });
-    res.json(bookings);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// =========================
-// Partner picks a booking
-// =========================
-export const pickOrder = async (req, res) => {
-  try {
-    const { bookingId } = req.params;
-    const partnerId = req.partner._id;
-
-    const booking = await Booking.findById(bookingId);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
-    if (booking.assignedTo) return res.status(400).json({ error: "Already picked by another partner" });
-
-    booking.assignedTo = partnerId;
-    booking.status = "picked";
-    await booking.save();
-
-    res.json({ message: "Order picked successfully", booking });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-};
-// =========================
-// Get logged-in user's bookings with assigned partner details
-// =========================
+/* ======================================================
+   USER BOOKINGS
+====================================================== */
 export const getUserBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({
-      $or: [
-        { user: req.user._id },
-        { user: null, email: req.user.email },
-      ]
+      $or: [{ user: req.user._id }, { user: null, email: req.user.email }],
     })
-      .populate("services.serviceId", "name price imageUrl") // populate service info
-  .populate("assignedTo", "name email phone avatar");
-    res.json(bookings);
+      .populate("items.service", "name price imageUrl")
+      .populate({
+        path: "items.combo",
+        select: "title price",
+        populate: { path: "services", select: "name price imageUrl" },
+      })
+      .populate("assignedTo", "name phone email");
+
+    res.status(200).json({ success: true, bookings });
   } catch (err) {
-    console.error(err);
+    console.error("Get user bookings error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-
-// =========================
-// Get all bookings (admin)
-// =========================
+/* ======================================================
+   ADMIN – GET ALL BOOKINGS
+====================================================== */
 export const getAllBookings = async (req, res) => {
   try {
     const bookings = await Booking.find()
-      .populate("services.serviceId", "name price imageUrl")
+      .populate("items.service", "name price imageUrl")
+      .populate({
+        path: "items.combo",
+        select: "title price",
+        populate: { path: "services", select: "name price imageUrl" },
+      })
       .populate("user", "name email phone")
       .populate("assignedTo", "name email phone");
 
-    res.json(bookings);
+    res.status(200).json({ success: true, bookings });
   } catch (err) {
-    console.error(err);
+    console.error("Admin bookings error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// =========================
-// Update booking (status / assign partner)
-// =========================
+/* ======================================================
+   UPDATE BOOKING STATUS (ADMIN)
+====================================================== */
 export const updateBooking = async (req, res) => {
   try {
-    const { status, assignedTo } = req.body;
+    const { status } = req.body;
+
     const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
 
-    if (status) booking.status = status;
+    if (status) {
+      booking.status = status;
 
-    if (assignedTo) {
-      const partner = await Partner.findById(assignedTo);
-      if (!partner) return res.status(400).json({ error: "Invalid partner ID" });
-      booking.assignedTo = assignedTo;
+      // 🔥 AUTO PAYMENT WHEN CONFIRMED
+      if (status === "confirmed" && booking.orderStatus !== "paid") {
+        booking.orderStatus = "paid";
+      }
     }
 
     await booking.save();
-    res.json({ message: "Booking updated successfully", booking });
+
+    res.status(200).json({
+      success: true,
+      booking,
+    });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// =========================
-// Delete a booking
-// =========================
+
+/* ======================================================
+   DELETE BOOKING
+====================================================== */
 export const deleteBooking = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
-
-    if (booking.user && booking.user.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ error: "Not authorized" });
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
     }
 
-    await booking.remove();
-    res.json({ message: "Booking deleted successfully" });
+    await booking.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Booking deleted successfully",
+    });
   } catch (err) {
-    console.error(err);
+    console.error("Delete booking error:", err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// =========================
-// Optional: Fix old bookings with null user
-// =========================
+/* ======================================================
+   PARTNER PICKS BOOKING
+====================================================== */
+export const pickOrder = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    if (booking.assignedTo) {
+      return res.status(400).json({ error: "Booking already picked" });
+    }
+
+    booking.assignedTo = req.partner._id;
+    booking.status = "picked";
+
+    await booking.save();
+
+    res.status(200).json({ success: true, booking });
+  } catch (err) {
+    console.error("Pick order error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ======================================================
+   PARTNER CONFIRM BOOKING
+====================================================== */
+export const confirmBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    booking.status = "confirmed";
+    await booking.save();
+
+    res.status(200).json({ success: true, booking });
+  } catch (err) {
+    console.error("Confirm booking error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ======================================================
+   MARK ORDER AS PAID  ✅ NEW
+====================================================== */
+export const markOrderPaid = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    booking.orderStatus = "paid";
+    await booking.save();
+
+    res.status(200).json({ success: true, booking });
+  } catch (err) {
+    console.error("Mark paid error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ======================================================
+   COMPLETE BOOKING (ONLY IF PAID)
+====================================================== */
+export const completeBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    if (booking.orderStatus !== "paid") {
+      return res.status(400).json({ error: "Payment not completed" });
+    }
+
+    booking.status = "completed";
+    await booking.save();
+
+    res.status(200).json({ success: true, booking });
+  } catch (err) {
+    console.error("Complete booking error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ======================================================
+   ASSIGN PARTNER (ADMIN)
+====================================================== */
+export const assignPartnerToBooking = async (req, res) => {
+  try {
+    const { partnerId } = req.body;
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    const partner = await Partner.findById(partnerId);
+    if (!partner) {
+      return res.status(404).json({ error: "Partner not found" });
+    }
+
+    booking.assignedTo = partnerId;
+    await booking.save();
+
+    const updatedBooking = await Booking.findById(booking._id)
+      .populate("items.service", "name price imageUrl")
+      .populate({
+        path: "items.combo",
+        select: "title price",
+        populate: { path: "services", select: "name price imageUrl" },
+      })
+      .populate("assignedTo", "name email phone");
+
+    res.status(200).json({ success: true, booking: updatedBooking });
+  } catch (err) {
+    console.error("Assign partner error:", err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+/* ======================================================
+   FIX OLD BOOKINGS (OPTIONAL)
+====================================================== */
 export const fixOldBookings = async (req, res) => {
   try {
     const updated = await Booking.updateMany(
       { user: null, email: req.user.email },
       { $set: { user: req.user._id } }
     );
-    res.json({ message: "Old bookings updated", modifiedCount: updated.modifiedCount });
+
+    res.status(200).json({
+      success: true,
+      modifiedCount: updated.modifiedCount,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-};
-
-
-// =========================
-// Complete a booking
-// =========================
-export const completeBooking = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const booking = await Booking.findById(id);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
-
-    if (booking.status !== "confirmed") {
-      return res.status(400).json({ error: "Booking must be confirmed before completing" });
-    }
-
-    booking.status = "completed";
-    await booking.save();
-
-    res.json({ message: "Booking completed successfully", booking });
-  } catch (err) {
-    console.error("Complete booking error:", err);
-    res.status(500).json({ error: err.message });
-  }
-};
-export const confirmBooking = async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
-
-    booking.status = "confirmed";
-    booking.assignedTo = req.partner._id;
-    await booking.save();
-
-    res.json({ message: "Booking confirmed", booking });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Partner rejects booking
-export const rejectBooking = async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
-
-    booking.status = "rejected";
-    await booking.save();
-
-    res.json({ message: "Booking rejected", booking });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
-  }
-};
-
-// Get partner notifications
-export const getPartnerNotifications = async (req, res) => {
-  try {
-    const notifications = await Notification.find({ partner: req.partner._id })
-      .populate("booking")
-      .sort({ createdAt: -1 });
-    res.json(notifications);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: error.message });
-  }
-};
-export const assignPartnerToBooking = async (req, res) => {
-  try {
-    const { partnerId } = req.body;
-    const bookingId = req.params.id;
-
-    if (!partnerId) return res.status(400).json({ error: "partnerId is required" });
-
-    const booking = await Booking.findById(bookingId);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
-
-    const partner = await Partner.findById(partnerId);
-    if (!partner) return res.status(404).json({ error: "Partner not found" });
-
-    // ✅ Only assign the partner, do NOT change the booking status
-    booking.assignedTo = partnerId;
-
-    await booking.save();
-
-    const updatedBooking = await Booking.findById(bookingId)
-      .populate("services.serviceId", "name price imageUrl")
-      .populate("user", "name email phone")
-      .populate("assignedTo", "name email phone");
-
-    res.json({ message: "Partner assigned successfully", booking: updatedBooking });
-  } catch (err) {
-    console.error("Assign partner error:", err);
+    console.error("Fix old bookings error:", err);
     res.status(500).json({ error: err.message });
   }
 };

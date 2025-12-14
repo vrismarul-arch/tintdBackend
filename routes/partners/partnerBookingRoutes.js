@@ -1,25 +1,31 @@
 import express from "express";
 import { partnerProtect } from "../../middleware/partnerAuthMiddleware.js";
 import {
+  getAvailableBookings,
   pickBooking,
   confirmBooking,
   completeBooking,
-  rejectBooking,getPartnerOrderHistory
+  getPartnerOrderHistory
 } from "../../controllers/partners/partnerBookingController.js";
 
 const router = express.Router();
 
-// Pick a booking
+/* =============================
+   STATIC ROUTES FIRST
+============================= */
+
+// ✅ Partner order history
+router.get("/history", partnerProtect, getPartnerOrderHistory);
+
+// ✅ Available bookings
+router.get("/available", partnerProtect, getAvailableBookings);
+
+/* =============================
+   DYNAMIC ROUTES AFTER
+============================= */
+
 router.put("/:id/pick", partnerProtect, pickBooking);
-
-// Confirm a booking
 router.put("/:id/confirm", partnerProtect, confirmBooking);
-
-// Complete a booking
 router.put("/:id/complete", partnerProtect, completeBooking);
 
-// Reject a booking
-router.put("/:id/reject", partnerProtect, rejectBooking);
-router.get("/history", partnerProtect, getPartnerOrderHistory);
 export default router;
- 

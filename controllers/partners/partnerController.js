@@ -86,17 +86,37 @@ export const updatePartner = async (req, res) => {
 export const getPartnerById = async (req, res) => {
   try {
     const { id } = req.params;
-    const partner = await Partner.findById(id);
-    if (!partner) return res.status(404).json({ error: "Partner not found" });
 
+    // 1️⃣ Validate Partner
+    const partner = await Partner.findById(id);
+    if (!partner) {
+      return res.status(404).json({ error: "Partner not found" });
+    }
+
+    // 2️⃣ Get bookings assigned to this partner
     const orders = await Booking.find({ assignedTo: id })
       .populate("user", "name email phone")
-      .populate("services.serviceId", "name price imageUrl");
+      .populate("assignedTo", "name email phone")
+      .populate("items.service", "name price imageUrl")
+      .populate({
+        path: "items.combo",
+        select: "title price",
+        populate: {
+          path: "services",
+          select: "name price imageUrl",
+        },
+      })
+      .sort({ createdAt: -1 });
 
-    // Make sure _id is included
-    res.json({ partner: { ...partner.toObject(), id: partner._id }, orders });
+    // 3️⃣ Response
+    res.status(200).json({
+      partner,
+      orders,
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch partner details" });
+    console.error("getPartnerById error:", err);
+    res.status(500).json({
+      error: "Failed to fetch partner details",
+    });
   }
 };

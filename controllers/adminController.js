@@ -1,106 +1,205 @@
-import Booking from "../models/Booking.js";
-import Partner from "../models/partners/Partner.js"; // ✅ Import Partner
-/*  */
-// Get all bookings (admin)
-export const getAllBookings = async (req, res) => {
-  try {
-    const bookings = await Booking.find()
-      .populate("services.serviceId", "name price")
-      .populate("user", "name email phone")
-      .populate("assignedTo", "name email phone"); // populate assigned partner
+  import Booking from "../models/Booking.js";
+  import Partner from "../models/partners/Partner.js"; // ✅ Import Partner
 
-    res.json({ bookings });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+  /* =========================
+    Get all bookings (admin)
+  ========================= */
+  export const getAllBookings = async (req, res) => {
+    try {
+      const bookings = await Booking.find()
+        .populate("items.service", "name price imageUrl")
+        .populate({
+          path: "items.combo",
+          select: "title name price imageUrl",
+          populate: {
+            path: "services",
+            select: "name price imageUrl",
+          },
+        })
+        .populate("user", "name email phone")
+        .populate("assignedTo", "name email phone"); // populate assigned partner
 
-export const getBookingById = async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id)
-      .populate("user", "name email phone")
-      .populate("services.serviceId", "name price")
-      .populate("assignedTo", "name email phone"); // populate partner
-
-    if (!booking) {
-      return res.status(404).json({ error: "Booking not found" });
+      res.json({ bookings });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
     }
+  };
 
-    res.json({ booking });
-  } catch (err) {
-    console.error("Error fetching booking:", err);
-    res.status(500).json({ error: "Server error fetching booking details" });
-  }
-};
+  /* =========================
+    Get booking by ID
+  ========================= */
+  export const getBookingById = async (req, res) => {
+    try {
+      const booking = await Booking.findById(req.params.id)
+        .populate("items.service", "name price imageUrl")
+        .populate({
+          path: "items.combo",
+          select: "title name price imageUrl",
+          populate: {
+            path: "services",
+            select: "name price imageUrl",
+          },
+        })
+        .populate("user", "name email phone")
+        .populate("assignedTo", "name email phone"); // populate partner
 
-// Update booking status
-export const updateBooking = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
+      if (!booking) {
+        return res.status(404).json({ error: "Booking not found" });
+      }
 
-    const booking = await Booking.findById(id);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
+      res.json({ booking });
+    } catch (err) {
+      console.error("Error fetching booking:", err);
+      res.status(500).json({ error: "Server error fetching booking details" });
+    }
+  };
 
-    if (status) booking.status = status;
+  /* =========================
+    Update booking status
+  ========================= */
+  export const updateBooking = async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
 
-    await booking.save();
+      const booking = await Booking.findById(id);
+      if (!booking) return res.status(404).json({ error: "Booking not found" });
 
-    const updatedBooking = await Booking.findById(id)
-      .populate("services.serviceId", "name price")
-      .populate("user", "name email phone")
-      .populate("assignedTo", "name email phone"); // populate partner
+      if (status) booking.status = status;
 
-    res.json({ message: "Booking updated", booking: updatedBooking });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
+      await booking.save();
 
-export const getAdminProfile = async (req, res) => {
-  try {
-    res.json({
-      _id: req.user._id,
-      name: req.user.name,
-      email: req.user.email,
-      phone: req.user.phone || null,
-      role: req.user.role || "admin",
-    });
-  } catch (error) {
-    console.error("Error fetching admin profile:", error);
-    res.status(500).json({ message: "Failed to fetch profile" });
-  }
-};
+      const updatedBooking = await Booking.findById(id)
+        .populate("items.service", "name price imageUrl")
+        .populate({
+          path: "items.combo",
+          select: "title name price imageUrl",
+          populate: {
+            path: "services",
+            select: "name price imageUrl",
+          },
+        })
+        .populate("user", "name email phone")
+        .populate("assignedTo", "name email phone"); // populate partner
 
-// =========================
-// Assign Partner to Booking
-// =========================
-export const assignPartnerToBooking = async (req, res) => {
-  try {
-    const { partnerId } = req.body;
-    const bookingId = req.params.id;
+      res.json({ message: "Booking updated", booking: updatedBooking });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  };
 
-    if (!partnerId) return res.status(400).json({ error: "partnerId is required" });
+  /* =========================
+    Get admin profile
+  ========================= */
+  export const getAdminProfile = async (req, res) => {
+    try {
+      res.json({
+        _id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        phone: req.user.phone || null,
+        role: req.user.role || "admin",
+      });
+    } catch (error) {
+      console.error("Error fetching admin profile:", error);
+      res.status(500).json({ message: "Failed to fetch profile" });
+    }
+  };
 
-    const booking = await Booking.findById(bookingId);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
+  /* =========================
+    Assign Partner to Booking
+  ========================= */
+  export const assignPartnerToBooking = async (req, res) => {
+    try {
+      const { partnerId } = req.body;
+      const bookingId = req.params.id;
 
-    const partner = await Partner.findById(partnerId);
-    if (!partner) return res.status(404).json({ error: "Partner not found" });
+      if (!partnerId)
+        return res.status(400).json({ error: "partnerId is required" });
 
-    // ✅ Only assign the partner, do NOT change the booking status
-    booking.assignedTo = partnerId;
+      const booking = await Booking.findById(bookingId);
+      if (!booking)
+        return res.status(404).json({ error: "Booking not found" });
 
-    await booking.save();
+      const partner = await Partner.findById(partnerId);
+      if (!partner)
+        return res.status(404).json({ error: "Partner not found" });
 
-    const updatedBooking = await Booking.findById(bookingId)
-      .populate("services.serviceId", "name price imageUrl")
-      .populate("user", "name email phone")
-      .populate("assignedTo", "name email phone");
+      // ✅ Only assign the partner, do NOT change the booking status
+      booking.assignedTo = partnerId;
+      await booking.save();
 
-    res.json({ message: "Partner assigned successfully", booking: updatedBooking });
-  } catch (err) {
-    console.error("Assign partner error:", err);
-    res.status(500).json({ error: err.message });
-  }
-};
+      const updatedBooking = await Booking.findById(bookingId)
+        .populate("items.service", "name price imageUrl")
+        .populate({
+          path: "items.combo",
+          select: "title name price imageUrl",
+          populate: {
+            path: "services",
+            select: "name price imageUrl",
+          },
+        })
+        .populate("user", "name email phone")
+        .populate("assignedTo", "name email phone");
+
+      res.json({
+        message: "Partner assigned successfully",
+        booking: updatedBooking,
+      });
+    } catch (err) {
+      console.error("Assign partner error:", err);
+      res.status(500).json({ error: err.message });
+    }
+  };
+  /* ======================================================
+    UPDATE PAYMENT STATUS (ADMIN)
+  ====================================================== */
+  export const updatePaymentStatus = async (req, res) => {
+    try {
+      const { orderStatus } = req.body;
+
+      // Allowed values check
+      if (!["unpaid", "paid", "refunded"].includes(orderStatus)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid payment status",
+        });
+      }
+
+      const booking = await Booking.findById(req.params.id);
+      if (!booking) {
+        return res.status(404).json({
+          success: false,
+          error: "Booking not found",
+        });
+      }
+
+      booking.orderStatus = orderStatus;
+      await booking.save();
+
+      // Re-fetch populated booking (important for admin UI update)
+      const updatedBooking = await Booking.findById(booking._id)
+        .populate("user", "name email phone")
+        .populate("assignedTo", "name email phone")
+        .populate("items.service", "name price imageUrl")
+        .populate({
+          path: "items.combo",
+          select: "title price",
+          populate: {
+            path: "services",
+            select: "name price imageUrl",
+          },
+        });
+
+      res.status(200).json({
+        success: true,
+        booking: updatedBooking,
+      });
+    } catch (err) {
+      console.error("Update payment status error:", err);
+      res.status(500).json({
+        success: false,
+        error: err.message,
+      });
+    }
+  };

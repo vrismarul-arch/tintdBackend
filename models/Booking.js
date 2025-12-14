@@ -1,48 +1,90 @@
+// models/Booking.js
 import mongoose from "mongoose";
 
 const bookingSchema = new mongoose.Schema(
   {
-    bookingId: { type: String, unique: true, trim: true }, // Auto-generated ID
-    user: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
-    name: { type: String, required: true },
-    email: { type: String, required: true },
-    phone: { type: String, required: true },
-    address: { type: String, required: true },
-    location: { lat: Number, lng: Number }, // Optional geolocation
-    services: [
+    bookingId: { type: String, unique: true },
+
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+
+    name: String,
+    email: String,
+    phone: String,
+    address: String,
+
+    location: {
+      lat: Number,
+      lng: Number,
+    },
+
+    // 🔥 SAME STRUCTURE AS CART
+    items: [
       {
-        serviceId: { type: mongoose.Schema.Types.ObjectId, ref: "Service" },
-        quantity: { type: Number, default: 1 },
+        itemType: {
+          type: String,
+          enum: ["service", "combo"],
+          required: true,
+        },
+
+        service: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Service",
+        },
+
+        combo: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "ComboPackage",
+        },
+
+        quantity: {
+          type: Number,
+          default: 1,
+        },
       },
     ],
-    totalAmount: { type: Number, required: true },
-    selectedDate: { type: Date, required: true },
-    selectedTime: { type: Date, required: true },
-    paymentMethod: { type: String, required: true },
+
+    totalAmount: Number,
+    selectedDate: Date,
+    selectedTime: String,
+
+    paymentMethod: String,
+orderStatus: {
+  type: String,
+  enum: [
+    "unpaid",
+    "paid",
+    "refunded",
+  ],
+  default: "unpaid",
+},
     status: {
       type: String,
       enum: ["pending", "picked", "confirmed", "completed", "cancelled"],
       default: "pending",
     },
-  assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "Partner", default: null },
+
+    assignedTo: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Partner",
+      default: null,
+    },
   },
   { timestamps: true }
 );
 
-// =========================
-// Auto-generate bookingId
-// =========================
+// Auto booking id
 bookingSchema.pre("save", async function (next) {
   if (this.isNew) {
-    const lastBooking = await this.constructor.findOne({}, {}, { sort: { createdAt: -1 } });
-    let nextId = 1;
+    const last = await this.constructor.findOne({}, {}, { sort: { createdAt: -1 } });
+    const nextNo = last?.bookingId
+      ? parseInt(last.bookingId.split("-")[1]) + 1
+      : 1;
 
-    if (lastBooking && lastBooking.bookingId) {
-      const lastNum = parseInt(lastBooking.bookingId.split("-")[1], 10);
-      if (!isNaN(lastNum)) nextId = lastNum + 1;
-    }
-
-    this.bookingId = `tind-${String(nextId).padStart(3, "0")}`;
+    this.bookingId = `tind-${String(nextNo).padStart(3, "0")}`;
   }
   next();
 });

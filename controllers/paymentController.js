@@ -20,7 +20,7 @@ export const createOrder = async (req, res) => {
     }
 
     const options = {
-      amount: Math.round(totalAmount * 100), // Razorpay uses paise
+      amount: Math.round(totalAmount * 100), // paise
       currency: "INR",
       receipt: "receipt_" + Date.now(),
     };
@@ -32,6 +32,7 @@ export const createOrder = async (req, res) => {
       amount: order.amount,
       currency: order.currency,
       status: "created",
+      user: req.user?._id || null,
     });
 
     res.json({
@@ -54,13 +55,14 @@ export const verifyPayment = async (req, res) => {
       razorpay_order_id,
       razorpay_payment_id,
       razorpay_signature,
-      bookingData, // entire booking details passed from frontend
+      bookingData,
     } = req.body;
 
     if (!bookingData) {
       return res.status(400).json({ error: "Booking data missing" });
     }
 
+    // 🔐 Verify signature
     const expectedSign = crypto
       .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
@@ -71,10 +73,12 @@ export const verifyPayment = async (req, res) => {
         { orderId: razorpay_order_id },
         { status: "failed" }
       );
-      return res.status(400).json({ success: false, message: "Invalid signature" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid signature" });
     }
 
-    // ✅ Mark payment as paid
+    // ✅ Mark payment as PAID
     const payment = await Payment.findOneAndUpdate(
       { orderId: razorpay_order_id },
       {
@@ -85,28 +89,35 @@ export const verifyPayment = async (req, res) => {
       { new: true }
     );
 
-    // ✅ Create confirmed booking
+    // ✅ Create booking (USING ITEMS)
     const booking = new Booking({
+      user: bookingData.userId || null,
       name: bookingData.name,
       email: bookingData.email,
       phone: bookingData.phone,
       address: bookingData.address,
-      services: bookingData.services,
+      location: bookingData.location,
+
+      items: bookingData.items, // ✅ FIXED (NOT services)
+
       totalAmount: bookingData.totalAmount,
-      paymentMethod: "razorpay",
       selectedDate: bookingData.selectedDate,
       selectedTime: bookingData.selectedTime,
+      paymentMethod: "razorpay",
       status: "confirmed",
-      user: bookingData.userId || null,
     });
 
     await booking.save();
 
-    // Link booking to payment
+    // 🔗 Link booking to payment
     payment.booking = booking._id;
+    payment.bookingData = bookingData;
     await payment.save();
 
-    return res.json({ success: true, booking });
+    return res.json({
+      success: true,
+      booking,
+    });
   } catch (err) {
     console.error("Verify payment error:", err);
     res.status(500).json({ error: err.message });
@@ -123,29 +134,50 @@ export const createCODBooking = async (req, res) => {
       email,
       phone,
       address,
-      services,
+      location,
+      items,
       totalAmount,
       userId,
       selectedDate,
       selectedTime,
     } = req.body;
 
+    if (
+      !name ||
+      !email ||
+      !phone ||
+      !address ||
+      !items ||
+      items.length === 0 ||
+      !selectedDate ||
+      !selectedTime
+    ) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
     const booking = new Booking({
+      user: userId || null,
       name,
       email,
       phone,
       address,
-      services,
+      location,
+
+      items, // ✅ FIXED
+
       totalAmount,
       paymentMethod: "cod",
       selectedDate,
       selectedTime,
       status: "confirmed",
-      user: userId || null,
     });
 
     await booking.save();
-    res.json({ success: true, booking });
+
+    res.json({
+      success: true,
+      booking,
+    });
   } catch (err) {
     console.error("COD booking error:", err);
     res.status(500).json({ error: err.message });

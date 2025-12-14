@@ -22,64 +22,44 @@ export const getAllPartners = async (req, res) => {
 export const approvePartner = async (req, res) => {
   try {
     const partner = await Partner.findById(req.params.id);
-    if (!partner) return res.status(404).json({ error: "Partner not found" });
+    if (!partner)
+      return res.status(404).json({ error: "Partner not found" });
 
-    // Generate incremental Partner ID
-    // ⚠️ This relies on the Counter model being correctly defined and persistent.
     const counter = await Counter.findOneAndUpdate(
       { name: "partnerId" },
       { $inc: { seq: 1 } },
-      { new: true, upsert: true } // Upsert ensures the counter document is created if it doesn't exist.
+      { new: true, upsert: true }
     );
 
     const partnerId = `tintdpartner-${String(counter.seq).padStart(3, "0")}`;
     const defaultPassword = "tintd@123456";
 
-    // Hash password before saving
-    const hashedPassword = await bcrypt.hash(defaultPassword, 10);
-
     partner.partnerId = partnerId;
     partner.status = "approved";
-    partner.password = hashedPassword;
+    partner.password = defaultPassword; // 🔥 PLAIN PASSWORD ONLY
 
-    await partner.save();
+    await partner.save(); // ✅ hashes once in model
 
-    // Send approval email
     await transporter.sendMail({
       from: `"Tintd Team" <${process.env.MAIL_USER}>`,
       to: partner.email,
-      subject: "✅ Partner Application Approved",
+      subject: "Partner Approved",
       html: `
-        <div style="max-width:600px;margin:auto;padding:20px;background-color:#f9f9f9;border-radius:8px;font-family:Arial,sans-serif;color:#333;line-height:1.6;">
-          <div style="text-align:center;margin-bottom:20px;">
-            <img src="https://bwglgjteqloufayiaadv.supabase.co/storage/v1/object/public/tintd/avatars/tintD.png" alt="Tintd Logo" style="width:120px;height:auto;margin-bottom:10px;" />
-            <h2 style="color:#2b2b2b;">🎉 Congratulations, ${partner.name}!</h2>
-          </div>
-          <p>Your partner application has been <b style="color:#27ae60;">approved</b>.</p>
-          <div style="background:#fff;padding:15px;border-radius:6px;border:1px solid #ddd;margin:20px 0;">
-            <p><b>Partner ID:</b> ${partner.partnerId}</p>
-            <p><b>Temporary Password:</b> ${defaultPassword}</p>
-          </div>
-          <p>Please log in using these credentials and <b>change your password</b> immediately for security purposes.</p>
-          <div style="text-align:center;margin-top:25px;">
-            <a href="https://tintd.in/partner/login" style="background:#007bff;color:#fff;text-decoration:none;padding:10px 20px;border-radius:4px;font-weight:bold;">Go to Partner Portal</a>
-          </div>
-          <hr style="margin:30px 0;border:none;border-top:1px solid #ddd;" />
-          <p style="text-align:center;font-size:14px;color:#666;">
-            Warm regards,<br/><b>Tintd Admin Team</b><br/>
-            <a href="https://tintd.in" style="color:#007bff;text-decoration:none;">tintd.in</a>
-          </p>
-        </div>
+        <p>Hello ${partner.name},</p>
+        <p>Your account is approved.</p>
+        <p><b>Partner ID:</b> ${partnerId}</p>
+        <p><b>Password:</b> ${defaultPassword}</p>
+        <p>Please login and change password.</p>
       `,
     });
 
-    res.status(200).json({
+    res.json({
       message: "Partner approved successfully",
       partnerId,
     });
   } catch (err) {
-    console.error("Error approving partner:", err);
-    res.status(500).json({ error: "Partner approval failed" });
+    console.error(err);
+    res.status(500).json({ error: "Approval failed" });
   }
 };
 

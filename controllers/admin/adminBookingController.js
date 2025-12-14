@@ -1,17 +1,30 @@
 import mongoose from "mongoose";
 import Booking from "../../models/Booking.js";
 import Payment from "../../models/Payment.js";
+import Partner from "../../models/partners/Partner.js";
 
-// ✅ Get all bookings (with display bookingId like BK-0001)
+// ===============================
+// Get all bookings (Admin)
+// ===============================
 export const getAllBookings = async (req, res) => {
   try {
     const bookings = await Booking.find()
       .populate("user", "name email phone")
-    //   .populate("assignedTo", "name email")
-      .populate("services.serviceId", "name price imageUrl")
+      .populate("assignedTo", "name email phone")
+      .populate("items.service", "name price imageUrl")
+      .populate({
+        path: "items.combo",
+        select: "title name price imageUrl",
+        populate: {
+          path: "services",
+          select: "name price imageUrl",
+        },
+      })
+      .sort({ createdAt: -1 })
       .lean();
 
     const bookingIds = bookings.map((b) => b._id);
+
     const payments = await Payment.find({
       booking: { $in: bookingIds },
     }).lean();
@@ -20,82 +33,104 @@ export const getAllBookings = async (req, res) => {
       const payment = payments.find(
         (p) => String(p.booking) === String(b._id)
       );
+
       return {
         ...b,
-        bookingId: `BK-${String(index + 1).padStart(4, "0")}`, // 👈 for display
+
+        // 🔹 Keep DB bookingId if exists, else generate display-only ID
+        bookingId:
+          b.bookingId || `BK-${String(index + 1).padStart(4, "0")}`,
+
+        // 🔹 Payment info (safe default)
         payment: payment
           ? {
               orderId: payment.orderId,
               paymentId: payment.paymentId,
-              status: payment.status,
+              status: payment.status, // paid | failed | refunded
               method: payment.method || "N/A",
               amount: payment.amount,
               currency: payment.currency,
               createdAt: payment.createdAt,
             }
-          : null,
+          : {
+              status: "unpaid",
+            },
       };
     });
 
-    res.status(200).json({ bookings: bookingsWithPayment });
+    res.status(200).json({
+      success: true,
+      bookings: bookingsWithPayment,
+    });
   } catch (err) {
     console.error("Failed to fetch all bookings:", err);
     res.status(500).json({ error: "Failed to fetch all bookings" });
   }
 };
-
-
-
-// ✅ Update booking
+// ===============================
+// Update booking (Admin)
+// ===============================
 export const updateBookingAdmin = async (req, res) => {
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
     const { status, assignedTo } = req.body;
-    
+
     if (!mongoose.Types.ObjectId.isValid(id))
-        return res.status(400).json({ error: "Invalid booking ID" });
+      return res.status(400).json({ error: "Invalid booking ID" });
 
     const booking = await Booking.findById(id);
     if (!booking) return res.status(404).json({ error: "Booking not found" });
-    
+
     if (status) booking.status = status;
     if (assignedTo) booking.assignedTo = assignedTo;
-    
+
     await booking.save();
 
     res.json({ message: "Booking updated successfully", booking });
-} catch (err) {
+  } catch (err) {
     console.error("Failed to update booking:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 };
 
-// ✅ Delete booking
+// ===============================
+// Delete booking (Admin)
+// ===============================
 export const deleteBookingAdmin = async (req, res) => {
-    try {
-        const { id } = req.params;
-        
+  try {
+    const { id } = req.params;
+
     if (!mongoose.Types.ObjectId.isValid(id))
       return res.status(400).json({ error: "Invalid booking ID" });
-    
+
     const booking = await Booking.findById(id);
     if (!booking) return res.status(404).json({ error: "Booking not found" });
-    
+
     await booking.deleteOne();
 
     res.json({ message: "Booking deleted successfully" });
-} catch (err) {
+  } catch (err) {
     console.error("Failed to delete booking:", err);
     res.status(500).json({ error: "Internal server error" });
-}
+  }
 };
-// ✅ Get single booking
+
+// ===============================
+// Get single booking (Admin)
+// ===============================
 export const getBookingById = async (req, res) => {
   try {
     const booking = await Booking.findById(req.params.id)
-      .populate("user")
-      .populate("services.serviceId")
-    //   .populate("assignedTo"); // <-- This is where Employee is used
+      .populate("user", "name email phone")
+      .populate("items.service", "name price imageUrl")
+      .populate({
+        path: "items.combo",
+        select: "title name price imageUrl",
+        populate: {
+          path: "services",
+          select: "name price imageUrl",
+        },
+      });
 
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
@@ -107,30 +142,46 @@ export const getBookingById = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
+// ===============================
+// Assign partner to booking
+// ===============================
 export const assignPartnerToBooking = async (req, res) => {
   try {
     const { partnerId } = req.body;
     const bookingId = req.params.id;
 
-    if (!partnerId) return res.status(400).json({ error: "partnerId is required" });
+    if (!partnerId)
+      return res.status(400).json({ error: "partnerId is required" });
 
     const booking = await Booking.findById(bookingId);
-    if (!booking) return res.status(404).json({ error: "Booking not found" });
+    if (!booking)
+      return res.status(404).json({ error: "Booking not found" });
 
     const partner = await Partner.findById(partnerId);
-    if (!partner) return res.status(404).json({ error: "Partner not found" });
+    if (!partner)
+      return res.status(404).json({ error: "Partner not found" });
 
-    // ✅ Only assign the partner, do NOT change the booking status
     booking.assignedTo = partnerId;
-
     await booking.save();
 
     const updatedBooking = await Booking.findById(bookingId)
-      .populate("services.serviceId", "name price imageUrl")
+      .populate("items.service", "name price imageUrl")
+      .populate({
+        path: "items.combo",
+        select: "title name price imageUrl",
+        populate: {
+          path: "services",
+          select: "name price imageUrl",
+        },
+      })
       .populate("user", "name email phone")
       .populate("assignedTo", "name email phone");
 
-    res.json({ message: "Partner assigned successfully", booking: updatedBooking });
+    res.json({
+      message: "Partner assigned successfully",
+      booking: updatedBooking,
+    });
   } catch (err) {
     console.error("Assign partner error:", err);
     res.status(500).json({ error: err.message });

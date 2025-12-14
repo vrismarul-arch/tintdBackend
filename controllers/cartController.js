@@ -1,14 +1,39 @@
 import asyncHandler from "express-async-handler";
 import Cart from "../models/Cart.js";
 import Service from "../models/Service.js";
+import ComboPackage from "../models/ComboPackage.js";
+import Banner from "../models/banner.js";
 
+/* ================= ADD TO CART ================= */
 export const addToCart = asyncHandler(async (req, res) => {
-  const { serviceId, quantity } = req.body;
+  const { itemType, itemId, quantity = 1 } = req.body;
 
-  const service = await Service.findById(serviceId);
-  if (!service) {
+  if (!["service", "combo"].includes(itemType)) {
+    res.status(400);
+    throw new Error("Invalid item type");
+  }
+
+  // validate item
+  let item;
+  let comboImage = null;
+
+  if (itemType === "service") {
+    item = await Service.findById(itemId);
+  } else {
+    item = await ComboPackage.findById(itemId);
+
+    // 🔥 GET COMBO IMAGE FROM BANNER
+    const banner = await Banner.findOne({
+      combo: itemId,
+      isActive: true,
+    }).select("imageUrl");
+
+    comboImage = banner?.imageUrl || null;
+  }
+
+  if (!item) {
     res.status(404);
-    throw new Error("Service not found");
+    throw new Error("Item not found");
   }
 
   let cart = await Cart.findOne({ user: req.user._id });
@@ -16,85 +41,130 @@ export const addToCart = asyncHandler(async (req, res) => {
     cart = new Cart({ user: req.user._id, items: [] });
   }
 
-  const itemIndex = cart.items.findIndex(
-    (item) => item.service.toString() === serviceId
+  const index = cart.items.findIndex(
+    (i) =>
+      i.itemType === itemType &&
+      (itemType === "service"
+        ? i.service?.toString() === itemId
+        : i.combo?.toString() === itemId)
   );
 
-  if (itemIndex > -1) {
-    cart.items[itemIndex].quantity += quantity;
+  if (index > -1) {
+    cart.items[index].quantity += quantity;
   } else {
-    cart.items.push({ service: serviceId, quantity });
+    cart.items.push({
+      itemType,
+      service: itemType === "service" ? itemId : null,
+      combo: itemType === "combo" ? itemId : null,
+      comboImage, // ✅ IMPORTANT
+      quantity,
+    });
   }
 
   await cart.save();
-  await cart.populate("items.service");
+
+  await cart.populate([
+    { path: "items.service" },
+    { path: "items.combo" },
+  ]);
 
   res.json({ items: cart.items });
 });
 
-// @desc Get cart
-// @route GET /api/cart
-// @access Private
+/* ================= GET CART ================= */
 export const getCart = asyncHandler(async (req, res) => {
-  const cart = await Cart.findOne({ user: req.user._id }).populate(
-    "items.service"
-  );
+  const cart = await Cart.findOne({ user: req.user._id })
+    .populate("items.service")
+    .populate("items.combo");
+
   if (!cart) {
     return res.json({ items: [] });
   }
-  res.json({ items: cart.items });
-});
 
-// @desc Remove item from cart
-// @route DELETE /api/cart/:serviceId
-// @access Private
+  // 🔥 Attach combo image from Banner
+  const itemsWithImages = await Promise.all(
+    cart.items.map(async (item) => {
+      if (item.itemType === "combo" && item.combo) {
+        const banner = await Banner.findOne({
+          combo: item.combo._id,
+          isActive: true,
+        }).select("imageUrl");
+
+        return {
+          ...item.toObject(),
+          comboImage: banner?.imageUrl || null,
+        };
+      }
+
+      return item.toObject();
+    })
+  );
+
+  res.json({ items: itemsWithImages });
+});
+/* ================= REMOVE ITEM ================= */
 export const removeFromCart = asyncHandler(async (req, res) => {
-  const { serviceId } = req.params;
+  const { itemType, itemId } = req.params;
 
   const cart = await Cart.findOne({ user: req.user._id });
-  if (!cart) return res.status(404).json({ message: "Cart not found" });
+  if (!cart) return res.json({ items: [] });
 
   cart.items = cart.items.filter(
-    (item) => item.service.toString() !== serviceId
+    (i) =>
+      !(
+        i.itemType === itemType &&
+        (itemType === "service"
+          ? i.service?.toString() === itemId
+          : i.combo?.toString() === itemId)
+      )
   );
+
   await cart.save();
-  await cart.populate("items.service");
+
+  await cart.populate([
+    { path: "items.service" },
+    { path: "items.combo" },
+  ]);
 
   res.json({ items: cart.items });
 });
 
-// @desc Update quantity
-// @route PUT /api/cart/:serviceId
-// @access Private
+/* ================= UPDATE QTY ================= */
 export const updateQuantity = asyncHandler(async (req, res) => {
-  const { serviceId } = req.params;
+  const { itemType, itemId } = req.params;
   const { quantity } = req.body;
 
-  if (quantity <= 0)
-    return res.status(400).json({ message: "Quantity must be > 0" });
+  if (quantity < 1) {
+    res.status(400);
+    throw new Error("Quantity must be > 0");
+  }
 
   const cart = await Cart.findOne({ user: req.user._id });
   if (!cart) return res.status(404).json({ message: "Cart not found" });
 
   const item = cart.items.find(
-    (i) => i.service.toString() === serviceId
+    (i) =>
+      i.itemType === itemType &&
+      (itemType === "service"
+        ? i.service?.toString() === itemId
+        : i.combo?.toString() === itemId)
   );
+
   if (!item) return res.status(404).json({ message: "Item not found" });
 
   item.quantity = quantity;
   await cart.save();
-  await cart.populate("items.service");
+
+  await cart.populate([
+    { path: "items.service" },
+    { path: "items.combo" },
+  ]);
 
   res.json({ items: cart.items });
 });
 
-
-export const clearCart = async (req, res) => {
-  try {
-    await Cart.deleteMany({ user: req.user._id }); // remove all items for the logged-in user
-    res.status(200).json({ success: true, message: "Cart cleared successfully" });
-  } catch (err) {
-    console.error("Clear cart error:", err);
-    res.status(500).json({ success: false, error: "Failed to clear cart" });
-  }
-};
+/* ================= CLEAR CART ================= */
+export const clearCart = asyncHandler(async (req, res) => {
+  await Cart.deleteMany({ user: req.user._id });
+  res.json({ success: true, message: "Cart cleared successfully" });
+});

@@ -1,29 +1,35 @@
 // controllers/partners/notificationController.js
 import Booking from "../../models/Booking.js";
 
-// Fetch notifications for logged-in partner
+// ===============================
+// Fetch notifications for partner
+// ===============================
 export const getPartnerNotifications = async (req, res) => {
   try {
     const partnerId = req.partner._id;
 
-    // Only bookings assigned to this partner and still pending acceptance
-    const bookings = await Booking.find({ 
+    // 🔔 Bookings assigned to this partner but not completed
+    const bookings = await Booking.find({
       assignedTo: partnerId,
-      status: "confirmed" // only newly assigned, not yet accepted/picked
+      status: { $in: ["picked", "confirmed"] },
     })
-      .populate("services.serviceId", "name price imageUrl")
+      .populate("items.service", "name price imageUrl")
+      .populate("items.combo", "title price services")
       .populate("user", "name email phone");
 
     const notifications = bookings.map((b) => ({
       id: b._id,
-      bookingId: b._id,
+      bookingId: b.bookingId || b._id,
       booking: b,
-      text: `Booking ${b.bookingId || b._id} has been assigned to you`,
+      text: `New booking ${b.bookingId || b._id} assigned to you`,
       status: b.status,
       createdAt: b.createdAt,
     }));
 
-    res.json(notifications);
+    res.json({
+      success: true,
+      notifications,
+    });
   } catch (err) {
     console.error("Get notifications error:", err);
     res.status(500).json({ error: err.message });
