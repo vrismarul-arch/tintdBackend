@@ -27,6 +27,7 @@ import partnerNotificationRoutes from "./routes/partners/notificationRoutes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
 import comboRoutes from "./routes/comboRoutes.js";
 // App Intro
+import addressRoutes from "./routes/addressRoutes.js";
 
 // Models
 import Cart from "./models/Cart.js";
@@ -69,7 +70,8 @@ app.use(express.urlencoded({ extended: true }));
    🚏 ROUTES
 ============================= */
 app.use("/api", eventSplashRoutes);
-app.use("/api/auth", authRoutes);
+app.use("/api/auth", authRoutes);app.use("/api/address", addressRoutes);
+
 app.use("/api/profile", profileRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/bookings", bookingRoutes);
