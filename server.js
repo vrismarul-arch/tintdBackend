@@ -32,6 +32,8 @@ import comboRoutes from "./routes/comboRoutes.js";
 import Cart from "./models/Cart.js";
 import Booking from "./models/Booking.js";
 import Partner from "./models/partners/Partner.js";
+// Event Splash
+import eventSplashRoutes from "./routes/eventSplashRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -66,6 +68,7 @@ app.use(express.urlencoded({ extended: true }));
 /* =============================
    🚏 ROUTES
 ============================= */
+app.use("/api", eventSplashRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/cart", cartRoutes);
