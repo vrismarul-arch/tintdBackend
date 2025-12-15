@@ -35,7 +35,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     phone: String,
 
-    addresses: [addressSchema], // ✅ MULTIPLE ADDRESSES
+    addresses: [addressSchema],
 
     avatar: {
       type: String,
@@ -43,15 +43,29 @@ const userSchema = new mongoose.Schema(
         "https://cdn-icons-png.flaticon.com/512/3135/3135715.png",
     },
 
-    role: { type: String, enum: ["user", "admin"], default: "user" },
+    role: {
+      type: String,
+      enum: ["user", "admin"],
+      default: "user",
+    },
   },
   { timestamps: true }
 );
 
+/* =============================
+   HASH PASSWORD BEFORE SAVE
+============================= */
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });
+
+/* =============================
+   COMPARE PASSWORD (🔥 MISSING PART)
+============================= */
+userSchema.methods.matchPassword = async function (enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
 
 export default mongoose.model("User", userSchema);
