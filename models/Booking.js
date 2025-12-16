@@ -66,7 +66,14 @@ orderStatus: {
       enum: ["pending", "picked", "confirmed", "completed", "cancelled"],
       default: "pending",
     },
+cancelReason: {
+  type: String,
+  trim: true,
+},
 
+cancelledAt: {
+  type: Date,
+},
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Partner",

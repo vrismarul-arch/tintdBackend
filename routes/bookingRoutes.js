@@ -9,7 +9,7 @@ import {
   fixOldBookings,
   pickOrder,
   confirmBooking,
-  completeBooking
+  completeBooking, cancelBooking
 } from "../controllers/bookingController.js";
 
 const router = express.Router();
@@ -20,6 +20,8 @@ router.get("/admin", protect, getAllBookings);
 router.put("/:id", protect, updateBooking);
 router.delete("/:id", protect, deleteBooking);
 router.post("/fix-old", protect, fixOldBookings);
+router.patch("/:id/cancel", protect, cancelBooking);
+
 
 // ✅ New booking action routes
 router.put("/:id/pick", protect, pickOrder);

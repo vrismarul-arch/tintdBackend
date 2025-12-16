@@ -222,6 +222,64 @@
     }
   };
 
+/* ======================================================
+   USER CANCEL BOOKING (WITH REASON)
+====================================================== */
+export const cancelBooking = async (req, res) => {
+  try {
+    const { reason } = req.body;
+
+    // ✅ Reason required
+    if (!reason || reason.trim().length < 3) {
+      return res.status(400).json({
+        error: "Cancel reason is required",
+      });
+    }
+
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({
+        error: "Booking not found",
+      });
+    }
+
+    // 🔐 Only booking owner can cancel
+    if (
+      booking.user &&
+      booking.user.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        error: "Unauthorized access",
+      });
+    }
+
+    // ❌ Cannot cancel completed booking
+    if (booking.status === "completed") {
+      return res.status(400).json({
+        error: "Completed bookings cannot be cancelled",
+      });
+    }
+
+    // ✅ Cancel booking
+    booking.status = "cancelled";
+    booking.cancelReason = reason;
+    booking.cancelledAt = new Date();
+
+    await booking.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Booking cancelled successfully",
+      booking,
+    });
+  } catch (err) {
+    console.error("Cancel booking error:", err);
+    res.status(500).json({
+      error: err.message,
+    });
+  }
+};
 
   /* ======================================================
     DELETE BOOKING
