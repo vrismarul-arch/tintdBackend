@@ -95,7 +95,11 @@ export const verifyPayment = async (req, res) => {
       { new: true }
     );
 
-    /* ✅ CREATE BOOKING */
+    if (!payment) {
+      return res.status(404).json({ error: "Payment record not found" });
+    }
+
+    /* ✅ CREATE BOOKING (ONLINE = PAID) */
     const booking = new Booking({
       user: bookingData.userId || null,
       name: bookingData.name,
@@ -109,6 +113,7 @@ export const verifyPayment = async (req, res) => {
       selectedTime: bookingData.selectedTime,
       paymentMethod: "razorpay",
       status: "confirmed",
+      orderStatus: "paid", // ✅ FIX: online payments always paid
     });
 
     await booking.save();
@@ -172,6 +177,7 @@ export const createCODBooking = async (req, res) => {
       selectedDate,
       selectedTime,
       status: "confirmed",
+      orderStatus: "unpaid", // ✅ FIX: COD starts unpaid
     });
 
     await booking.save();
