@@ -3,34 +3,30 @@ import bcrypt from "bcryptjs";
 
 const partnerSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    phone: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    city: { type: String, required: true },
-    gender: {
-      type: String,
-      enum: ["Male", "Female", "Other"],
-      required: true,
-    },
-    profession: {
-      type: String,
-      enum: ["Beautician", "Makeup Artist", "Massage Therapist"],
-      required: true,
-    },
+    name: String,
+    phone: String,
+    email: { type: String, unique: true },
+    city: String,
+    gender: String,
+    profession: String,
 
+    avatar: String,
     aadhaarFront: String,
     aadhaarBack: String,
     pan: String,
+    professionalCert: String,
+
     bankName: String,
     accountNumber: String,
+    accountHolder: String,
     ifsc: String,
+
     experience: { type: String, default: "fresher" },
-    professionalCert: String,
     dob: String,
-    avatar: String,
 
     partnerId: { type: String, unique: true },
-    password: { type: String },
+    password: String,
+
     status: {
       type: String,
       enum: ["pending", "approved", "rejected"],
@@ -38,16 +34,20 @@ const partnerSchema = new mongoose.Schema(
     },
 
     stepStatus: {
-      profileSetup: { type: Boolean, default: false },
-      documents: { type: Boolean, default: false },
-      bankInfo: { type: Boolean, default: false },
-      approval: { type: Boolean, default: false },
+      profileSetup: Boolean,
+      documents: Boolean,
+      bankInfo: Boolean,
+      approval: Boolean,
     },
+
+    // 🔐 OTP RESET
+    resetOtp: String,
+    resetOtpExpire: Date,
   },
   { timestamps: true }
 );
 
-/* 🔐 HASH PASSWORD (ONLY HERE) */
+// 🔒 Hash password
 partnerSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);
@@ -55,9 +55,9 @@ partnerSchema.pre("save", async function (next) {
   next();
 });
 
-/* 🔑 COMPARE PASSWORD */
-partnerSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
+// 🔑 Compare password
+partnerSchema.methods.matchPassword = function (enteredPassword) {
+  return bcrypt.compare(enteredPassword, this.password);
 };
 
 export default mongoose.model("Partner", partnerSchema);

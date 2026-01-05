@@ -3,19 +3,30 @@ import {
   loginPartner,
   getPartnerProfile,
   updatePartner,
+  upload,
 } from "../../controllers/partners/partnerAuthController.js";
+
+import {
+  forgotPartnerPassword,
+  verifyPartnerResetOtp,
+  resetPartnerPasswordOtp,
+} from "../../controllers/partners/partnerPasswordController.js";
+
 import { partnerProtect } from "../../middleware/partnerAuthMiddleware.js";
-import { upload } from "../../controllers/partners/partnerAuthController.js"; // ✅ bring upload here
 
 const router = express.Router();
 
-// Public login
+// 🔐 AUTH
 router.post("/login", loginPartner);
 
-// Protected profile
+// 🔁 OTP PASSWORD RESET
+router.post("/forgot-password", forgotPartnerPassword);
+router.post("/verify-reset-otp", verifyPartnerResetOtp);
+router.post("/reset-password-otp", resetPartnerPasswordOtp);
+
+// 👤 PROFILE
 router.get("/profile", partnerProtect, getPartnerProfile);
 
-// Update partner (with file upload)
 router.put(
   "/update",
   partnerProtect,

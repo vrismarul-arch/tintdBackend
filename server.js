@@ -70,7 +70,8 @@ app.use(express.urlencoded({ extended: true }));
    🚏 ROUTES
 ============================= */
 app.use("/api", eventSplashRoutes);
-app.use("/api/auth", authRoutes);app.use("/api/address", addressRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/address", addressRoutes);
 
 app.use("/api/profile", profileRoutes);
 app.use("/api/cart", cartRoutes);
