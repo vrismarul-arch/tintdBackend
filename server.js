@@ -26,15 +26,13 @@ import partnerBookingRoutes from "./routes/partners/partnerBookingRoutes.js";
 import partnerNotificationRoutes from "./routes/partners/notificationRoutes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
 import comboRoutes from "./routes/comboRoutes.js";
-// App Intro
 import addressRoutes from "./routes/addressRoutes.js";
+import eventSplashRoutes from "./routes/eventSplashRoutes.js";
 
 // Models
 import Cart from "./models/Cart.js";
 import Booking from "./models/Booking.js";
 import Partner from "./models/partners/Partner.js";
-// Event Splash
-import eventSplashRoutes from "./routes/eventSplashRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -42,27 +40,21 @@ connectDB();
 const app = express();
 
 /* =============================
-   🌐 CORS
+   🌐 CORS (FIXED)
 ============================= */
-const allowedOrigins = [
-  "http://localhost:5173",
-  "https://tintd.netlify.app",
-  "https://tintd.in",
-  "https://www.tintd.in",
-];
-
 app.use(
   cors({
-    origin: (origin, cb) => {
-      if (!origin) return cb(null, true);
-      if (!allowedOrigins.includes(origin))
-        return cb(new Error(`CORS blocked: ${origin}`));
-      cb(null, true);
-    },
+    origin: true, // ✅ allow all origins dynamically
     credentials: true,
   })
 );
 
+// ✅ Handle preflight requests
+app.options("*", cors());
+
+/* =============================
+   🧾 MIDDLEWARE
+============================= */
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -72,7 +64,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", eventSplashRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/address", addressRoutes);
-
 app.use("/api/profile", profileRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/bookings", bookingRoutes);
@@ -90,31 +81,31 @@ app.use("/api/combos", comboRoutes);
 // Partner
 app.use("/api/partners", partnerRoutes);
 app.use("/api/partners", partnerOnboardingRoutes);
-app.use("/api/admin/partners", adminPartnerRoutes);
 app.use("/api/partners/onboarding", partnerOnboardingRoutes);
 app.use("/api/partners/bookings", partnerBookingRoutes);
 app.use("/api/partners/notifications", partnerNotificationRoutes);
 
-// Health
-app.get("/", (_req, res) =>
-  res.send("Salon Booking API running ✅")
-);
+// Health check
+app.get("/", (_req, res) => {
+  res.send("Salon Booking API running ✅");
+});
 
 /* =============================
-   🔊 SOCKET SETUP
+   🔊 SOCKET.IO
 ============================= */
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins,
+    origin: true,
     credentials: true,
   },
 });
 
-// Emit helper
-const emitUpdate = (room, event, data) =>
+// Helper
+const emitUpdate = (room, event, data) => {
   io.to(room).emit(event, data);
+};
 
 /* =============================
    🔄 SOCKET CONNECTION
@@ -127,9 +118,8 @@ io.on("connection", (socket) => {
   });
 
   /* =============================
-     🛒 CART SOCKET (SERVICE + COMBO)
+     🛒 CART SOCKET
   ============================= */
-
   const emitCart = async (userId) => {
     const cart = await Cart.findOne({ user: userId }).populate([
       { path: "items.service" },
@@ -219,7 +209,7 @@ io.on("connection", (socket) => {
   });
 
   /* =============================
-     📦 BOOKING SOCKETS
+     📦 BOOKINGS
   ============================= */
   socket.on("newBooking", async ({ bookingId }) => {
     const booking = await Booking.findById(bookingId).populate(
@@ -236,7 +226,8 @@ io.on("connection", (socket) => {
     const booking = await Booking.findById(bookingId).populate(
       "services.serviceId"
     );
-    if (booking) emitUpdate(`partner:${partnerId}`, "assignedBooking", booking);
+    if (booking)
+      emitUpdate(`partner:${partnerId}`, "assignedBooking", booking);
   });
 
   socket.on("partnerApproved", async ({ partnerId }) => {
@@ -247,15 +238,16 @@ io.on("connection", (socket) => {
     }
   });
 
-  socket.on("disconnect", () =>
-    console.log("🔴 Socket disconnected:", socket.id)
-  );
+  socket.on("disconnect", () => {
+    console.log("🔴 Socket disconnected:", socket.id);
+  });
 });
 
 /* =============================
    🚀 SERVER START
 ============================= */
 const PORT = process.env.PORT || 5002;
-httpServer.listen(PORT, () =>
-  console.log(`🚀 Server running on http://localhost:${PORT}`)
-);
+
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
+});
