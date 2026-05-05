@@ -11,7 +11,7 @@ import {
   cancelBridalBooking,
   deleteBridalBooking,
   getBridalBookingStats
-} from '../controllers/BridalBookingController.js';
+} from '../controllers/bridalBookingController.js';
 
 const router = express.Router();
 
