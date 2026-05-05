@@ -1,4 +1,5 @@
 import express from "express";
+import crypto from "crypto";       // ✅ ADD THIS
 import cors from "cors";
 import dotenv from "dotenv";
 import { createServer } from "http";
