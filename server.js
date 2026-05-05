@@ -49,7 +49,7 @@ import quoteRoutes from "./routes/quoteRoutes.js";
 // ✅ ADDON ROUTES
 import addOnRoutes from "./routes/addonRoutes.js";
 import eventRoutes from "./routes/EventRoutes.js";
-import makeupRoutes from "./routes/makeupRoutes.js";
+import makeupRoutes from "./routes/MakeupRoutes.js";
 // ✅ BRIDAL COMBO ROUTES
 import bridalComboRoutes from "./routes/bridalComboRoutes.js";
 
