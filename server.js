@@ -7,6 +7,17 @@ import { Server } from "socket.io";
 // DB
 import connectDB from "./config/db.js";
 
+// ✅ IMPORT ALL MODELS FIRST (in correct order)
+import "./models/Event.js";
+import "./models/Makeup.js";
+import "./models/AddOn.js";
+import "./models/BridalCombo.js";
+
+// Models for socket.io
+import Cart from "./models/Cart.js";
+import Booking from "./models/Booking.js";
+import Partner from "./models/partners/Partner.js";
+
 // Routes
 import authRoutes from "./routes/authRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
@@ -29,10 +40,18 @@ import comboRoutes from "./routes/comboRoutes.js";
 import addressRoutes from "./routes/addressRoutes.js";
 import eventSplashRoutes from "./routes/eventSplashRoutes.js";
 
-// Models
-import Cart from "./models/Cart.js";
-import Booking from "./models/Booking.js";
-import Partner from "./models/partners/Partner.js";
+// ✅ BRIDAL BOOKING ROUTES (for customer bookings)
+import bridalBookingRoutes from "./routes/BridalBookingRoutes.js";
+
+// ✅ QUOTE REQUEST ROUTES
+import quoteRoutes from "./routes/quoteRoutes.js";
+
+// ✅ ADDON ROUTES
+import addOnRoutes from "./routes/addonRoutes.js";
+import eventRoutes from "./routes/EventRoutes.js";
+import makeupRoutes from "./routes/makeupRoutes.js";
+// ✅ BRIDAL COMBO ROUTES
+import bridalComboRoutes from "./routes/bridalComboRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -40,17 +59,14 @@ connectDB();
 const app = express();
 
 /* =============================
-   🌐 CORS (FIXED)
+   🌐 CORS
 ============================= */
 app.use(
   cors({
-    origin: true, // ✅ allow all origins dynamically
+    origin: true,
     credentials: true,
   })
 );
-
-// ✅ Handle preflight requests
-app.options("*", cors());
 
 /* =============================
    🧾 MIDDLEWARE
@@ -78,12 +94,35 @@ app.use("/api/payment", paymentRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/combos", comboRoutes);
 
-// Partner
+// Partner routes
 app.use("/api/partners", partnerRoutes);
-app.use("/api/partners", partnerOnboardingRoutes);
 app.use("/api/partners/onboarding", partnerOnboardingRoutes);
 app.use("/api/partners/bookings", partnerBookingRoutes);
 app.use("/api/partners/notifications", partnerNotificationRoutes);
+
+// Bridal
+// ============================================
+// 🎀 BRIDAL & MAKEUP ROUTES
+// ============================================
+
+// 1. Events
+app.use("/api/events", eventRoutes);
+
+// 2. Makeup services
+app.use("/api/makeups", makeupRoutes);
+
+// 3. Add-ons (Hair, Makeup, Mehendi, Draping, Skincare, etc.)
+app.use("/api/addons", addOnRoutes);
+
+// 4. Bridal Combos (Packages combining multiple services)
+app.use("/api/bridal-combos", bridalComboRoutes);
+
+// 5. Quote Requests (Customer inquiries before booking)
+app.use("/api/quote-requests", quoteRoutes);
+
+// 6. Bridal Bookings (Confirmed bookings from quotes or direct)
+app.use("/api/bridal-bookings", bridalBookingRoutes);
+
 
 // Health check
 app.get("/", (_req, res) => {
@@ -163,7 +202,8 @@ io.on("connection", (socket) => {
 
       await cart.save();
       await emitCart(userId);
-    } catch {
+    } catch (err) {
+      console.error("Cart error:", err);
       emitUpdate(`user:${userId}`, "cartError", "Add to cart failed");
     }
   });
@@ -185,7 +225,8 @@ io.on("connection", (socket) => {
       }
 
       await emitCart(userId);
-    } catch {
+    } catch (err) {
+      console.error("Quantity update error:", err);
       emitUpdate(`user:${userId}`, "cartError", "Quantity update failed");
     }
   });
@@ -203,7 +244,8 @@ io.on("connection", (socket) => {
 
       await cart.save();
       await emitCart(userId);
-    } catch {
+    } catch (err) {
+      console.error("Remove error:", err);
       emitUpdate(`user:${userId}`, "cartError", "Remove failed");
     }
   });
