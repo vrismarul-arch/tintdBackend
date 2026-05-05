@@ -1,7 +1,7 @@
 // controllers/bridalBookingController.js
 import BridalBooking from '../models/BridalBooking.js';
 import BridalCombo from '../models/BridalCombo.js';
-import Addon from '../models/Addon.js';
+import Addon from '../models/AddOn.js';
 import QuoteRequest from '../models/QuoteRequest.js';
 
 // Create new booking from quote

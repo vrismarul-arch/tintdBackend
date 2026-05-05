@@ -1,5 +1,5 @@
 // controllers/addonController.js
-import Addon from '../models/Addon.js';
+import Addon from '../models/AddOn.js';
 
 // Get all addons
 export const getAddons = async (req, res) => {

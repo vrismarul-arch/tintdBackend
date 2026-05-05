@@ -1,7 +1,7 @@
     // controllers/quoteController.js
 import QuoteRequest from '../models/QuoteRequest.js';
 import BridalCombo from '../models/BridalCombo.js';
-import Addon from '../models/Addon.js';
+import Addon from '../models/AddOn.js';
 
 // Create a new quote request
 export const createQuoteRequest = async (req, res) => {

@@ -2,7 +2,7 @@
 import BridalCombo from "../models/BridalCombo.js";
 import Event from "../models/Event.js";
 import Makeup from "../models/Makeup.js";
-import Addon from "../models/Addon.js";
+import Addon from "../models/AddOn.js";
 
 // Helper function to get item price
 const getItemPrice = (itemType, itemData) => {
