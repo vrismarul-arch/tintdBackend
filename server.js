@@ -10,7 +10,7 @@ import connectDB from "./config/db.js";
 // ✅ IMPORT ALL MODELS FIRST (in correct order)
 import "./models/Event.js";
 import "./models/Makeup.js";
-import "./models/AddOn.js";
+import "./models/Addon.js";
 import "./models/BridalCombo.js";
 
 // Models for socket.io
