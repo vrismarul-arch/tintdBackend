@@ -3,17 +3,23 @@ import Event from "../models/Event.js";
 // ➕ Create Event
 export const createEvent = async (req, res) => {
   try {
-    const { name, title, description, minPrice, maxPrice, icon } = req.body;
+    const { name, title, description, priceRange, icon } = req.body;
+    
+    // If frontend sends minPrice/maxPrice separately
+    let finalPriceRange = priceRange;
+    if (req.body.minPrice !== undefined && req.body.maxPrice !== undefined) {
+      finalPriceRange = {
+        min: req.body.minPrice,
+        max: req.body.maxPrice,
+      };
+    }
 
     const event = await Event.create({
       name,
       title,
       description,
       icon,
-      priceRange: {
-        min: minPrice,
-        max: maxPrice,
-      },
+      priceRange: finalPriceRange,
     });
 
     res.status(201).json(event);
@@ -21,7 +27,6 @@ export const createEvent = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 // 📥 Get Events
 export const getEvents = async (req, res) => {
   try {
@@ -35,7 +40,16 @@ export const getEvents = async (req, res) => {
 // ✏️ Update Event
 export const updateEvent = async (req, res) => {
   try {
-    const { name, title, description, minPrice, maxPrice, icon } = req.body;
+    const { name, title, description, priceRange, minPrice, maxPrice, icon } = req.body;
+    
+    // Handle both formats
+    let finalPriceRange = priceRange;
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      finalPriceRange = {
+        min: minPrice !== undefined ? minPrice : priceRange?.min,
+        max: maxPrice !== undefined ? maxPrice : priceRange?.max,
+      };
+    }
 
     const updated = await Event.findByIdAndUpdate(
       req.params.id,
@@ -44,10 +58,7 @@ export const updateEvent = async (req, res) => {
         title,
         description,
         icon,
-        priceRange: {
-          min: minPrice,
-          max: maxPrice,
-        },
+        priceRange: finalPriceRange,
       },
       { new: true }
     );
@@ -57,7 +68,6 @@ export const updateEvent = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 // 🗑 Delete Event
 export const deleteEvent = async (req, res) => {
   try {
